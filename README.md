@@ -65,7 +65,7 @@ Détails d'implémentation :
 - **Décodage JSON strict** (`JSON_THROW_ON_ERROR`) et **vérification du statut HTTP** : une page HTML d'erreur du serveur provoquait un `TypeError` dans l'upstream.
 - **Validation du code-barres** (chiffres uniquement) et encodage URL : plus d'injection possible de segments d'URL via `getProduct()`.
 - `404` → `ProductNotFoundException`, credentials manquants → `MissingCredentialsException`, code-barres invalide → `InvalidParameterException`.
-- **`activeTestMode()` sépare les deux authentifications** : `off`/`off` est la protection HTTP Basic du serveur de staging (`.net`), pas un compte — les identifiants de compte OFF passent exclusivement par `authentification()` et sont envoyés dans le corps des écritures v3. Dans l'upstream, les deux étaient confondus.
+- **`activeTestMode()` distingue le htaccess du staging des identifiants du contributeur** : `off`/`off` est la protection htaccess (HTTP Basic) du serveur de test `.net`, pas un compte contributeur. Le SDK l'envoie dans l'en-tête `Authorization`, tandis que les identifiants du contributeur — fournis via `authentification()` — partent dans le corps des écritures v3 (`user_id`/`password`). L'upstream confondait les deux : `activeTestMode()` écrasait les identifiants du contributeur avec `off`/`off`, faisant échouer toute écriture sur le staging.
 
 ### 3. Documentation et exemples réparés
 
@@ -81,7 +81,7 @@ Détails d'implémentation :
 
 - PHP **8.1 → 8.4** (aucune syntaxe au-delà de 8.1 ; testé notamment sous 8.3).
 - Dépendances inchangées : Guzzle 7, PSR-3, PSR-16.
-- API publique rétrocompatible, à trois exceptions près : `uploadImage()` retourne désormais l'enveloppe v3 et fonctionne pour tous les flavors ; les codes-barres non numériques sont rejetés ; `activeTestMode()` ne définit plus de compte `off`/`off` (appelez `authentification()` avec un vrai compte de staging pour écrire).
+- API publique rétrocompatible, à trois exceptions près : `uploadImage()` retourne désormais l'enveloppe v3 et fonctionne pour tous les flavors ; les codes-barres non numériques sont rejetés ; `activeTestMode()` ne pose plus `off`/`off` que comme htaccess du `.net` — pour écrire sur le staging, fournissez un compte contributeur via `authentification()`.
 - Les nouvelles exceptions (`InvalidParameterException`, `UnknownException`, `ProductUpdateException`) étendent `BadRequestException` : un `catch (BadRequestException)` écrit contre l'upstream continue de les attraper.
 
 ## Licence et crédits
