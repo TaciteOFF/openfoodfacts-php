@@ -239,7 +239,6 @@ composer install
 vendor/bin/phpunit --testsuite "Unit test"      # unitaires (MockHandler, sans réseau)
 vendor/bin/phpunit --testsuite "Integration test"  # frappe l'API réelle
 vendor/bin/phpstan                               # analyse statique (niveau 8)
-vendor/bin/php-cs-fixer fix --dry-run            # style
 ```
 
 La CI GitHub Actions rejoue l'ensemble sur PHP 8.1 → 8.4.
