@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.0](https://github.com/TaciteOFF/openfoodfacts-php/compare/v0.4.0...v1.0.0) (2026-08-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* uploadImage() now returns the v3 response envelope and works for all flavors; non-numeric barcodes are rejected with InvalidParameterException.
+
+### Features
+
+* migrate product read, write and image upload to API v3.6 ([2e69df6](https://github.com/TaciteOFF/openfoodfacts-php/commit/2e69df601bd38f34623d8856868bdea8794e8d4a))
+
+
+### Bug Fixes
+
+* ext-gd as dev. dependency ([db75b14](https://github.com/TaciteOFF/openfoodfacts-php/commit/db75b14e79bc61674d8162e386cde3e3cbe9072b))
+* harden v3 write path (redirects, partial failures, staging auth) ([ece667d](https://github.com/TaciteOFF/openfoodfacts-php/commit/ece667dfd62a72801dbe92c74174557292a54dda))
+* **workflow:** replace deprecated set-output command ([9e0361e](https://github.com/TaciteOFF/openfoodfacts-php/commit/9e0361ea09176e5834016a8650828a41a4e82548))
+
 ## [0.4.0](https://github.com/openfoodfacts/openfoodfacts-php/compare/v0.3.0...v0.4.0) (2024-11-06)
 
 
