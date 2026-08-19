@@ -16,10 +16,12 @@ Le fork n'est pas publié sur Packagist : installez-le via un dépôt VCS dans v
     { "type": "vcs", "url": "https://github.com/TaciteOFF/openfoodfacts-php" }
   ],
   "require": {
-    "openfoodfacts/openfoodfacts-php": "dev-develop"
+    "openfoodfacts/openfoodfacts-php": "^1.0"
   }
 }
 ```
+
+(ou `"dev-develop"` pour suivre la branche de développement)
 
 ## Usage rapide
 
