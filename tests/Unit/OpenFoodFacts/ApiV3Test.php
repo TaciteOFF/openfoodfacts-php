@@ -8,8 +8,8 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
 use OpenFoodFacts\Api;
-use OpenFoodFacts\Document;
 use OpenFoodFacts\Document\FoodDocument;
+use OpenFoodFacts\Document\ProductDocument;
 use OpenFoodFacts\Exception\BadRequestException;
 use OpenFoodFacts\Exception\InvalidParameterException;
 use OpenFoodFacts\Exception\MissingCredentialsException;
@@ -21,16 +21,30 @@ use Psr\Http\Message\RequestInterface;
 
 class ApiV3Test extends TestCase
 {
-    /** @var array<int, array{request: RequestInterface}> */
-    private array $history = [];
+    /** @var callable(): array<int, array{request: RequestInterface}> */
+    private $readHistory;
 
     private function createApi(MockHandler $mockHandler, string $currentAPI = 'food'): Api
     {
-        $this->history = [];
-        $handlerStack  = HandlerStack::create($mockHandler);
-        $handlerStack->push(Middleware::history($this->history));
+        $history      = [];
+        $handlerStack = HandlerStack::create($mockHandler);
+        $handlerStack->push(Middleware::history($history));
+        $this->readHistory = static function () use (&$history): array {
+            // the history middleware only appends to the container, it never
+            // replaces it, so $history always stays an array in practice
+            return is_array($history) ? $history : [];
+        };
 
         return new Api('Unit test', $currentAPI, 'world', null, new Client(['handler' => $handlerStack]));
+    }
+
+    /**
+     * The requests recorded by the Guzzle history middleware
+     * @return array<int, array{request: RequestInterface}>
+     */
+    private function history(): array
+    {
+        return ($this->readHistory)();
     }
 
     private static function successEnvelope(array $product): string
@@ -60,7 +74,7 @@ class ApiV3Test extends TestCase
         $this->assertInstanceOf(FoodDocument::class, $product);
         $this->assertSame('Volvic', $product->product_name);
 
-        $request = $this->history[0]['request'];
+        $request = $this->history()[0]['request'];
         $this->assertSame('GET', $request->getMethod());
         $this->assertSame(
             '/api/v' . Api::API_VERSION . '/product/3057640385148',
@@ -70,7 +84,7 @@ class ApiV3Test extends TestCase
         $this->assertSame('world.openfoodfacts.org', $request->getUri()->getHost());
     }
 
-    public function testGetProductReturnsGenericDocumentForUnknownApi(): void
+    public function testGetProductReturnsFlavorSpecificDocument(): void
     {
         $mockHandler = new MockHandler([
             new Response(200, [], self::successEnvelope(['code' => '123', 'product_name' => 'thing'])),
@@ -78,7 +92,7 @@ class ApiV3Test extends TestCase
         $api = $this->createApi($mockHandler, 'product');
 
         $document = $api->getProduct('123');
-        $this->assertInstanceOf(Document::class, $document);
+        $this->assertInstanceOf(ProductDocument::class, $document);
     }
 
     public function testGetProductThrowsOnNotFound(): void
@@ -149,7 +163,7 @@ class ApiV3Test extends TestCase
 
         $this->assertSame('success', $result['status']);
 
-        $request = $this->history[0]['request'];
+        $request = $this->history()[0]['request'];
         $this->assertSame('PATCH', $request->getMethod());
         $this->assertSame(
             '/api/v' . Api::API_VERSION . '/product/3057640385148',
@@ -206,7 +220,7 @@ class ApiV3Test extends TestCase
 
         $this->assertSame('success', $result['status']);
 
-        $request = $this->history[0]['request'];
+        $request = $this->history()[0]['request'];
         $this->assertSame('POST', $request->getMethod());
         $this->assertSame(
             '/api/v' . Api::API_VERSION . '/product/3057640385148/images',
@@ -238,8 +252,8 @@ class ApiV3Test extends TestCase
 
         $api->updateProduct('3057640385148', ['product_name_fr' => 'Eau de Volvic']);
 
-        $this->assertCount(2, $this->history);
-        $redirectedRequest = $this->history[1]['request'];
+        $this->assertCount(2, $this->history());
+        $redirectedRequest = $this->history()[1]['request'];
         $this->assertSame('PATCH', $redirectedRequest->getMethod(), 'the redirected request must NOT be downgraded to GET');
 
         $body = json_decode((string) $redirectedRequest->getBody(), true);
@@ -302,7 +316,7 @@ class ApiV3Test extends TestCase
 
         $api->getProduct('123', null, null, null, null, 'all');
 
-        $this->assertSame('product_type=all', $this->history[0]['request']->getUri()->getQuery());
+        $this->assertSame('product_type=all', $this->history()[0]['request']->getUri()->getQuery());
     }
 
     public function testTestModeUsesBasicGateSeparatedFromAccountCredentials(): void
@@ -316,7 +330,7 @@ class ApiV3Test extends TestCase
 
         $api->updateProduct('3057640385148', ['product_name_fr' => 'Eau de Volvic']);
 
-        $request = $this->history[0]['request'];
+        $request = $this->history()[0]['request'];
         $this->assertSame('world.openfoodfacts.net', $request->getUri()->getHost());
         $this->assertSame('Basic ' . base64_encode('off:off'), $request->getHeaderLine('Authorization'), 'the staging HTTP Basic gate must stay off/off');
 
