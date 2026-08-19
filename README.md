@@ -4,6 +4,8 @@ Fork de [openfoodfacts/openfoodfacts-php](https://github.com/openfoodfacts/openf
 
 Ce fork migre le wrapper vers l'**API Open Food Facts v3.6** (schéma produit 1004) et corrige plusieurs bugs de robustesse de la version upstream (v0.4.0), restée sur l'API v0 legacy.
 
+📖 **Documentation complète : [doc/home.md](doc/home.md)** — ce README se concentre sur les différences avec l'upstream.
+
 ## Installation
 
 Le fork n'est pas publié sur Packagist : installez-le via un dépôt VCS dans votre `composer.json` :
