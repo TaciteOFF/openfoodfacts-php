@@ -1,96 +1,85 @@
-# openfoodfacts-php - Official PHP package for Open Food Facts
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://static.openfoodfacts.org/images/logos/off-logo-horizontal-dark.png?refresh_github_cache=1">
-  <source media="(prefers-color-scheme: light)" srcset="https://static.openfoodfacts.org/images/logos/off-logo-horizontal-light.png?refresh_github_cache=1">
-  <img height="48" src="https://static.openfoodfacts.org/images/logos/off-logo-horizontal-light.svg">
-</picture>
+# openfoodfacts-php — fork adapté à l'API v3.6
 
-PHP API Wrapper for [Open Food Facts](https://openfoodfacts.org/), the open database about food.
+Fork de [openfoodfacts/openfoodfacts-php](https://github.com/openfoodfacts/openfoodfacts-php), le wrapper PHP pour [Open Food Facts](https://openfoodfacts.org/), la base de données ouverte sur les produits alimentaires.
 
-[![Project Status](https://opensource.box.com/badges/active.svg)](https://opensource.box.com/badges)
-[![Build Status](https://travis-ci.org/openfoodfacts/openfoodfacts-php.svg?branch=master)](https://travis-ci.org/openfoodfacts/openfoodfacts-php)
-[![Average time to resolve an issue](https://isitmaintained.com/badge/resolution/openfoodfacts/openfoodfacts-php.svg)](https://isitmaintained.com/project/openfoodfacts/openfoodfacts-php "Average time to resolve an issue")
-[![Percentage of issues still open](https://isitmaintained.com/badge/open/openfoodfacts/openfoodfacts-php.svg)](https://isitmaintained.com/project/openfoodfacts/openfoodfacts-php "Percentage of issues still open")
-
-## Current features
-* Search-A-Licious (#62), user-agent (#53), PHP 8.1 (#47), Image upload
-* Most features should be visible here: https://github.com/openfoodfacts/openfoodfacts-php/blob/develop/src/Api.php
-* PLEASE DOCUMENT ANY MISSING FEATURES HERE
+Ce fork migre le wrapper vers l'**API Open Food Facts v3.6** (schéma produit 1004) et corrige plusieurs bugs de robustesse de la version upstream (v0.4.0), restée sur l'API v0 legacy.
 
 ## Installation
 
-With Composer:
+Le fork n'est pas publié sur Packagist : installez-le via un dépôt VCS dans votre `composer.json` :
 
-```bash
-composer require openfoodfacts/openfoodfacts-php
+```json
+{
+  "repositories": [
+    { "type": "vcs", "url": "https://github.com/TaciteOFF/openfoodfacts-php" }
+  ],
+  "require": {
+    "openfoodfacts/openfoodfacts-php": "dev-develop"
+  }
+}
 ```
 
-## Usage
-This is the most basic way of creating the API:
+## Usage rapide
+
 ```php
-$api = new OpenFoodFacts\Api('food','fr');
-$product = $api->getProduct('3057640385148');
-```
-In the example above you access the "food" database, limited to the French language/country scope. 
-The first parameter is either 
- - "food"
- - "beauty" or 
- - "pet"
- 
-to decide which product database you want to use.
+// Le user agent (1er argument) est obligatoire — décrivez votre application
+$api = new OpenFoodFacts\Api('MonApp - Web - 1.0 - https://example.org', 'food', 'fr');
 
-The second parameter decides the language/country scope of the chosen database: f.e. "world" or "de" or "fr". 
+// Lecture via l'API v3.6 : filtrez les champs (recommandé) et localisez la réponse
+$product = $api->getProduct('3057640385148', ['product_name', 'nutriscore_grade'], 'fr');
+echo $product->product_name;
 
-For more details on this topic: see the [API Documentation](https://en.wiki.openfoodfacts.org/API/Read#Countries_and_Language_of_the_Response)
-
-These are all the parameters you really need for basic usage.
-
-As return types for ```$api->getProduct``` you get an ```Document::class``` Object. 
-This may also be an Object of Type  ```FoodProduct::class```,```PetProduct::class```, ```BeautyProduct::class``` depending on which API you are creating.
-These objects inherit from the more generic ```Document::class```
-
-In the example above, we use the 'food' API and there will get a ```FoodProduct::class```
-
-For getting a first overview the ```Document::class``` has a function to return an array representation(sorted) for a first start. 
-```php
-$product = $api->getProduct('3057640385148');
-$productDataAsArray = $product->getData();
+// Écriture structurée (PATCH v3) et upload d'image (POST v3) — credentials requis
+$api->authentification('utilisateur', 'mot-de-passe');
+$api->updateProduct('3057640385148', ['product_name_fr' => 'Eau de Volvic', 'categories_tags' => ['en:waters']]);
+$api->uploadImage('3057640385148', 'front', '/chemin/image.jpg', 'fr');
 ```
 
+## Différences avec l'upstream
 
-#### Optional Parameters
-The other parameters are optional and for a more sophisticated use of the api (from a software development point of view):
+### 1. Migration vers l'API v3.6
 
-An example in code is found here: [cached_example.php](examples/01-basic_api_usage/cached_example.php)
+Réf. : [changelog API et schéma produit](https://openfoodfacts.github.io/openfoodfacts-server/api/ref-api-and-product-schema-change-log/)
 
-LoggerInterface: A logger which decieds where to log errors to (file, console , etc) 
+| Fonction | Upstream (v0.4.0) | Ce fork |
+|---|---|---|
+| Lecture produit | `GET /api/v0/product/{code}` | `GET /api/v3.6/product/{code}` (schéma produit 1004 épinglé) |
+| Paramètres de lecture | aucun | `fields`, `lc`, `cc`, `tags_lc` (optionnels, rétrocompatibles) |
+| Écriture produit | `cgi/product_jqm2.pl` (formulaire legacy) | nouvelle méthode `updateProduct()` : `PATCH /api/v3.6/product/{code}` en JSON structuré (champs par langue, tags, packagings, sélection d'images) |
+| Upload d'image | `cgi/product_image_upload.pl` (multipart, food uniquement) | `POST /api/v3.6/product/{code}/images` (base64 + structure `selected` par champ/langue, tous les flavors) |
+| Enveloppe de réponse | `status` 0/1 | enveloppe v3 (`status`, `result`, `errors[]`, `warnings[]`) avec messages d'erreur lisibles extraits de `errors[]` |
+| Redirections 302 (produit d'un autre type) | non gérées | suivies automatiquement |
 
-see: [PSR-3 Loggerinterface](https://www.php-fig.org/psr/psr-3/)
+Détails d'implémentation :
 
-ClientInterface: The HTTP Client - to adjust the connection configs to your needs and more 
+- `Api::API_VERSION = '3.6'` (constante publique) : toutes les routes produit sont versionnées, la structure de réponse reste stable même quand le serveur évolue.
+- `addNewProduct()` (cgi legacy) est conservée mais **dépréciée** au profit de `updateProduct()`.
+- `Document::__get` renvoie `null` pour un champ absent (au lieu d'un warning PHP) : indispensable avec la v3.6, qui supprime les champs `*_hierarchy` et `*_lc` au profit de `tags_sources`, et depuis la v3.1 renomme `ecoscore_*` en `environmental_score_*`.
 
-see: [Guzzle HTTP Client](https://packagist.org/packages/guzzlehttp/guzzle)
+### 2. Corrections de bugs (présents dans l'upstream)
 
-CacheInterface: To temporarily save the results of API request to improve the performance and to reduce the load on the API- Server 
+- **Les réponses POST ne sont plus mises en cache** : dans l'upstream, un second envoi identique (`addNewProduct`, `uploadImage`) dans la durée de vie du cache ne faisait jamais la requête — une écriture silencieusement perdue. La clé de cache entrait de plus en collision pour tous les uploads (ressource non sérialisable par `json_encode`).
+- **TTL sur le cache de lecture (1 h)** : l'upstream cachait les fiches produit sans expiration.
+- **Décodage JSON strict** (`JSON_THROW_ON_ERROR`) et **vérification du statut HTTP** : une page HTML d'erreur du serveur provoquait un `TypeError` dans l'upstream.
+- **Validation du code-barres** (chiffres uniquement) et encodage URL : plus d'injection possible de segments d'URL via `getProduct()`.
+- `404` → `ProductNotFoundException`, credentials manquants → `MissingCredentialsException`, code-barres invalide → `InvalidParameterException`.
 
-see: [PSR-16 Simple Cache](https://www.php-fig.org/psr/psr-16/)
+### 3. Documentation et exemples réparés
 
-## Development
+- Les exemples du README upstream ne compilaient plus (le constructeur exige `$userAgent` en premier argument depuis la 0.4.0) ; `cached_example.php` passait en plus un `int` à `getProduct(string)`.
+- Le badge Travis CI mort a été retiré.
 
-### Contributing
+### 4. Tests
 
-1. Fork it ( https://github.com/openfoodfacts/openfoodfacts-php/fork )
-2. Create your feature branch (`git checkout -b my-new-feature`)
-3. Launch test `vendor/bin/phpunit` && cs-fixer `vendor/bin/php-cs-fixer fix`
-4. Commit your changes (`git commit -am 'Add some feature'`)
-5. Push to the branch (`git push origin my-new-feature`)
-6. Create a new Pull Request
+- Nouvelle suite unitaire `tests/Unit/OpenFoodFacts/ApiV3Test.php` (11 tests sur `MockHandler` Guzzle) : URL versionnée, enveloppe v3, 404, erreurs lisibles, corps PATCH, payload base64 — sans dépendre de l'API live.
+- Tests d'intégration mis en cohérence (la restriction « upload food uniquement » n'existe plus en v3).
 
-## Using this SDK and Third party applications
+## Compatibilité
 
-- If you use this SDK, feel free to open a PR to add your application in the list in [REUSERS.md](https://github.com/openfoodfacts/openfoodfacts-php/blob/develop/REUSERS.md)
-- Make sure you comply with the OdBL licence, mentioning the Source of your data, and ensuring to avoid combining non free data you can't release legally as open data. Another requirement is contributing back any product you add using this SDK.
-- Please get in touch at reuse@openfoodfacts.org
-- We are very interested in learning what the Open Food Facts data is used for. It is not mandatory, but we would very much appreciate it if you tell us about your re-uses (https://forms.gle/hwaeqBfs8ywwhbTg8) so that we can share them with the Open Food Facts community. You can also fill this form to get a chance to get your app featured: https://forms.gle/hwaeqBfs8ywwhbTg8
+- PHP **8.1 → 8.4** (aucune syntaxe au-delà de 8.1 ; testé notamment sous 8.3).
+- Dépendances inchangées : Guzzle 7, PSR-3, PSR-16.
+- API publique rétrocompatible, à deux exceptions près : `uploadImage()` retourne désormais l'enveloppe v3 et fonctionne pour tous les flavors ; les codes-barres non numériques sont rejetés.
 
-## Authors
+## Licence et crédits
+
+Code sous licence MIT, comme l'upstream. Les données Open Food Facts sont sous licence [OdBL](https://opendatacommons.org/licenses/odbl/summary/) : mentionnez la source et contribuez en retour les produits que vous ajoutez. Merci aux auteurs du wrapper original ([liste](https://github.com/openfoodfacts/openfoodfacts-php#authors)) et à la communauté Open Food Facts.
