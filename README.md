@@ -1,5 +1,7 @@
 # openfoodfacts-php — fork adapté à l'API v3.6
 
+🇫🇷 Version française · 🇬🇧 [English version](README.en.md)
+
 Fork de [openfoodfacts/openfoodfacts-php](https://github.com/openfoodfacts/openfoodfacts-php), le wrapper PHP pour [Open Food Facts](https://openfoodfacts.org/), la base de données ouverte sur les produits alimentaires.
 
 Ce fork migre le wrapper vers l'**API Open Food Facts v3.6** (schéma produit 1004) et corrige plusieurs bugs de robustesse de la version upstream (v0.4.0), restée sur l'API v0 legacy.

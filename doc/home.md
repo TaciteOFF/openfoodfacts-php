@@ -1,5 +1,7 @@
 # Documentation — openfoodfacts-php (fork v3.6)
 
+🇫🇷 Version française · 🇬🇧 [English version](home.en.md)
+
 Wrapper PHP pour les API [Open Food Facts](https://world.openfoodfacts.org/), [Open Beauty Facts](https://world.openbeautyfacts.org/), [Open Pet Food Facts](https://world.openpetfoodfacts.org/) et [Open Products Facts](https://world.openproductsfacts.org/).
 
 Ce fork utilise l'**API v3.6** (schéma produit 1004) pour la lecture, l'écriture et l'upload d'images produit. Les différences avec l'upstream sont listées dans le [README](../README.md).
@@ -30,12 +32,12 @@ Ce fork utilise l'**API v3.6** (schéma produit 1004) pour la lecture, l'écritu
     { "type": "vcs", "url": "https://github.com/TaciteOFF/openfoodfacts-php" }
   ],
   "require": {
-    "openfoodfacts/openfoodfacts-php": "dev-develop"
+    "openfoodfacts/openfoodfacts-php": "^1.0"
   }
 }
 ```
 
-Prérequis : PHP ≥ 8.1 (testé jusqu'à 8.4), extensions `json` et `curl`.
+Prérequis : PHP ≥ 8.1 (testé jusqu'à 8.4), extension `json`.
 
 ## Le client `Api`
 
