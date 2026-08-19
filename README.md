@@ -48,7 +48,9 @@ Réf. : [changelog API et schéma produit](https://openfoodfacts.github.io/openf
 | Écriture produit | `cgi/product_jqm2.pl` (formulaire legacy) | nouvelle méthode `updateProduct()` : `PATCH /api/v3.6/product/{code}` en JSON structuré (champs par langue, tags, packagings, sélection d'images) |
 | Upload d'image | `cgi/product_image_upload.pl` (multipart, food uniquement) | `POST /api/v3.6/product/{code}/images` (base64 + structure `selected` par champ/langue, tous les flavors) |
 | Enveloppe de réponse | `status` 0/1 | enveloppe v3 (`status`, `result`, `errors[]`, `warnings[]`) avec messages d'erreur lisibles extraits de `errors[]` |
-| Redirections 302 (produit d'un autre type) | non gérées | suivies automatiquement |
+| Écriture partiellement rejetée | non détectable | `success_with_errors` → `ProductUpdateException` (l'enveloppe complète reste accessible via `getResponse()`) ; `success_with_warnings` journalisé via le logger |
+| Produit d'un autre type (cross-flavor) | non géré | paramètre `product_type` de `getProduct()` (ex. `'all'`) : le serveur redirige vers le bon flavor, redirection suivie automatiquement |
+| Redirections | `strict = false` (un PATCH/POST redirigé en 301/302 serait rétrogradé en GET sans corps) | mode `strict` : la méthode et le corps sont préservés sur les redirections |
 
 Détails d'implémentation :
 
@@ -63,6 +65,7 @@ Détails d'implémentation :
 - **Décodage JSON strict** (`JSON_THROW_ON_ERROR`) et **vérification du statut HTTP** : une page HTML d'erreur du serveur provoquait un `TypeError` dans l'upstream.
 - **Validation du code-barres** (chiffres uniquement) et encodage URL : plus d'injection possible de segments d'URL via `getProduct()`.
 - `404` → `ProductNotFoundException`, credentials manquants → `MissingCredentialsException`, code-barres invalide → `InvalidParameterException`.
+- **`activeTestMode()` sépare les deux authentifications** : `off`/`off` est la protection HTTP Basic du serveur de staging (`.net`), pas un compte — les identifiants de compte OFF passent exclusivement par `authentification()` et sont envoyés dans le corps des écritures v3. Dans l'upstream, les deux étaient confondus.
 
 ### 3. Documentation et exemples réparés
 
@@ -78,7 +81,8 @@ Détails d'implémentation :
 
 - PHP **8.1 → 8.4** (aucune syntaxe au-delà de 8.1 ; testé notamment sous 8.3).
 - Dépendances inchangées : Guzzle 7, PSR-3, PSR-16.
-- API publique rétrocompatible, à deux exceptions près : `uploadImage()` retourne désormais l'enveloppe v3 et fonctionne pour tous les flavors ; les codes-barres non numériques sont rejetés.
+- API publique rétrocompatible, à trois exceptions près : `uploadImage()` retourne désormais l'enveloppe v3 et fonctionne pour tous les flavors ; les codes-barres non numériques sont rejetés ; `activeTestMode()` ne définit plus de compte `off`/`off` (appelez `authentification()` avec un vrai compte de staging pour écrire).
+- Les nouvelles exceptions (`InvalidParameterException`, `UnknownException`, `ProductUpdateException`) étendent `BadRequestException` : un `catch (BadRequestException)` écrit contre l'upstream continue de les attraper.
 
 ## Licence et crédits
 

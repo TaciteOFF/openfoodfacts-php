@@ -12,6 +12,7 @@ use OpenFoodFacts\Exception\BadRequestException;
 use OpenFoodFacts\Exception\InvalidParameterException;
 use OpenFoodFacts\Exception\MissingCredentialsException;
 use OpenFoodFacts\Exception\ProductNotFoundException;
+use OpenFoodFacts\Exception\ProductUpdateException;
 use OpenFoodFacts\Exception\UnknownException;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -54,9 +55,17 @@ class Api
     public string $geography  = 'world';
 
     /**
-     * this property store the auth parameter (username and password)
+     * this property store the Open Food Facts account credentials
+     * (user_id and password), sent in the body of WRITE requests
      */
     private ?array $auth       = null;
+
+    /**
+     * HTTP Basic auth [username, password] protecting the host itself
+     * (only used by the staging server enabled via activeTestMode());
+     * distinct from the account credentials stored in $auth
+     */
+    private ?array $httpAuth   = null;
 
     /**
      * this property help you to log information
@@ -156,8 +165,10 @@ class Api
      */
     public function activeTestMode(): void
     {
-        $this->geoUrl = 'https://world.openfoodfacts.net';
-        $this->authentification('off', 'off');
+        $this->geoUrl   = 'https://world.openfoodfacts.net';
+        // "off"/"off" is the HTTP Basic gate protecting the staging host, NOT an
+        // account: call authentification() with a real (staging) account to write
+        $this->httpAuth = ['off', 'off'];
     }
 
     public function getCurrentApi(): string
@@ -234,6 +245,10 @@ class Api
      * @param string|null $lc 2-letter language code used to localize some returned fields
      * @param string|null $cc 2-letter country code
      * @param string|null $tagsLc 2-letter language code used to localize taxonomy tags
+     * @param string|null $productType requested product type (food, beauty, petfood, product or "all").
+     *                                 With "all", the server redirects to the flavor matching the
+     *                                 product (redirect followed transparently); without it, a product
+     *                                 stored on another flavor is reported as not found
      * @return Document         A Document if found
      * @throws InvalidArgumentException
      * @throws InvalidParameterException
@@ -241,17 +256,18 @@ class Api
      * @throws BadRequestException
      * @throws UnknownException
      */
-    public function getProduct(string $barcode, ?array $fields = null, ?string $lc = null, ?string $cc = null, ?string $tagsLc = null): Document
+    public function getProduct(string $barcode, ?array $fields = null, ?string $lc = null, ?string $cc = null, ?string $tagsLc = null, ?string $productType = null): Document
     {
         if ($barcode === '' || !ctype_digit($barcode)) {
             throw new InvalidParameterException(sprintf('Barcode "%s" is invalid: it must only contain digits', $barcode));
         }
 
         $query = array_filter([
-            'fields'  => $fields !== null ? implode(',', $fields) : null,
-            'lc'      => $lc,
-            'cc'      => $cc,
-            'tags_lc' => $tagsLc,
+            'fields'       => $fields !== null ? implode(',', $fields) : null,
+            'lc'           => $lc,
+            'cc'           => $cc,
+            'tags_lc'      => $tagsLc,
+            'product_type' => $productType,
         ], static fn ($value) => $value !== null);
 
         $url = sprintf('%s/api/v%s/product/%s', $this->geoUrl, self::API_VERSION, rawurlencode($barcode));
@@ -311,6 +327,7 @@ class Api
      * @throws InvalidParameterException
      * @throws MissingCredentialsException
      * @throws ProductNotFoundException
+     * @throws ProductUpdateException when the write failed or was only partially applied
      * @throws UnknownException
      */
     public function updateProduct(string $barcode, array $productData, ?array $fields = null, ?string $lc = null, ?string $cc = null, ?string $tagsLc = null): array
@@ -336,12 +353,7 @@ class Api
 
         $result = $this->fetchV3('patch', $url, ['json' => $body]);
 
-        if (($result['status'] ?? '') === 'failure') {
-            throw new BadRequestException(sprintf(
-                'Product update failed: %s',
-                $this->formatV3Errors($result)
-            ));
-        }
+        $this->assertWriteSucceeded($result, 'Product update');
 
         return $result;
     }
@@ -360,6 +372,10 @@ class Api
         if (!isset($postData['code']) || !isset($postData['product_name'])) {
             throw new BadRequestException('code or product_name not found!');
         }
+
+        // the legacy cgi API expects the account credentials as form parameters;
+        // explicit values already present in $postData take precedence
+        $postData = array_merge($this->auth ?? [], $postData);
 
         $url = $this->buildUrl('cgi', 'product_jqm2.pl', []);
         $result = $this->fetchPost($url, $postData);
@@ -393,6 +409,7 @@ class Api
      * @throws InvalidParameterException
      * @throws MissingCredentialsException
      * @throws ProductNotFoundException
+     * @throws ProductUpdateException when the upload failed or was only partially applied
      * @throws UnknownException
      */
     public function uploadImage(string $code, string $imageField, string $imagePath, string $imageLc = 'en'): array
@@ -432,12 +449,7 @@ class Api
 
         $result = $this->fetchV3('post', $url, ['json' => $body]);
 
-        if (($result['status'] ?? '') === 'failure') {
-            throw new BadRequestException(sprintf(
-                'Image upload failed: %s',
-                $this->formatV3Errors($result)
-            ));
-        }
+        $this->assertWriteSucceeded($result, 'Image upload');
 
         return $result;
     }
@@ -637,8 +649,17 @@ class Api
             return $cachedResult;
         }
 
-        $options             = array_merge($this->getDefaultOptions(), $options);
+        $options                = array_merge($this->getDefaultOptions(), $options);
         $options['http_errors'] = false;
+        // "strict" keeps the request method on 301/302 redirects: without it,
+        // Guzzle downgrades a redirected PATCH/POST to a body-less GET, and a
+        // write would silently be lost while still reporting success
+        $options['allow_redirects'] = [
+            'max'             => 5,
+            'strict'          => true,
+            'referer'         => false,
+            'track_redirects' => true,
+        ];
 
         try {
             $response = $this->httpClient->request($method, $url, $options);
@@ -675,7 +696,7 @@ class Api
             throw new BadRequestException(sprintf(
                 'OpenFoodFact - the API returned an error (HTTP %d): %s',
                 $statusCode,
-                $this->formatV3Errors($decoded)
+                $this->formatV3Messages($decoded, 'errors')
             ), $statusCode);
         }
 
@@ -687,14 +708,47 @@ class Api
     }
 
     /**
-     * Build a readable message from the errors of a v3 response envelope
+     * Validate the status of a v3 WRITE response envelope.
+     *
+     * "failure" and "success_with_errors" (a partially rejected write) both
+     * throw; "success_with_warnings" is logged and returns normally.
+     *
      * @param array $result the decoded v3 response envelope
+     * @param string $operation human readable operation name for messages
+     * @throws ProductUpdateException
+     */
+    private function assertWriteSucceeded(array $result, string $operation): void
+    {
+        $status = $result['status'] ?? '';
+
+        if ($status === 'failure' || $status === 'success_with_errors') {
+            throw new ProductUpdateException(sprintf(
+                '%s %s: %s',
+                $operation,
+                $status === 'failure' ? 'failed' : 'partially failed (some fields were rejected)',
+                $this->formatV3Messages($result, 'errors')
+            ), $result);
+        }
+
+        if ($status === 'success_with_warnings') {
+            $this->logger->warning(sprintf(
+                'OpenFoodFact - %s succeeded with warnings: %s',
+                $operation,
+                $this->formatV3Messages($result, 'warnings')
+            ));
+        }
+    }
+
+    /**
+     * Build a readable message from the errors or warnings of a v3 response envelope
+     * @param array $result the decoded v3 response envelope
+     * @param string $key "errors" or "warnings"
      * @return string
      */
-    private function formatV3Errors(array $result): string
+    private function formatV3Messages(array $result, string $key = 'errors'): string
     {
         $messages = [];
-        foreach ((array) ($result['errors'] ?? []) as $error) {
+        foreach ((array) ($result[$key] ?? []) as $error) {
             if (!is_array($error)) {
                 continue;
             }
@@ -777,8 +831,8 @@ class Api
         $data = [
             'headers' => $this->getDefaultHeaders(),
         ];
-        if ($this->auth) {
-            $data['auth'] = array_values($this->auth);
+        if ($this->httpAuth) {
+            $data['auth'] = $this->httpAuth;
         }
 
         return $data;

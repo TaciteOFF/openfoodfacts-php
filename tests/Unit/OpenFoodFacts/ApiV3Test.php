@@ -14,6 +14,7 @@ use OpenFoodFacts\Exception\BadRequestException;
 use OpenFoodFacts\Exception\InvalidParameterException;
 use OpenFoodFacts\Exception\MissingCredentialsException;
 use OpenFoodFacts\Exception\ProductNotFoundException;
+use OpenFoodFacts\Exception\ProductUpdateException;
 use OpenFoodFacts\Exception\UnknownException;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\RequestInterface;
@@ -224,5 +225,112 @@ class ApiV3Test extends TestCase
 
         $this->expectException(BadRequestException::class);
         $api->uploadImage('3057640385148', 'barcode-photo', __FILE__);
+    }
+
+    public function testPatchKeepsMethodAndBodyAcrossRedirects(): void
+    {
+        $mockHandler = new MockHandler([
+            new Response(302, ['Location' => 'https://world.openfoodfacts.org/api/v' . Api::API_VERSION . '/product/3057640385148']),
+            new Response(200, ['Content-Type' => 'application/json'], self::successEnvelope([])),
+        ]);
+        $api = $this->createApi($mockHandler);
+        $api->authentification('user', 'secret');
+
+        $api->updateProduct('3057640385148', ['product_name_fr' => 'Eau de Volvic']);
+
+        $this->assertCount(2, $this->history);
+        $redirectedRequest = $this->history[1]['request'];
+        $this->assertSame('PATCH', $redirectedRequest->getMethod(), 'the redirected request must NOT be downgraded to GET');
+
+        $body = json_decode((string) $redirectedRequest->getBody(), true);
+        $this->assertSame('Eau de Volvic', $body['product']['product_name_fr'], 'the redirected request must keep its body');
+    }
+
+    public function testUpdateProductThrowsOnPartialFailure(): void
+    {
+        $mockHandler = new MockHandler([
+            new Response(200, ['Content-Type' => 'application/json'], (string) json_encode([
+                'status' => 'success_with_errors',
+                'result' => ['id' => 'product_updated', 'name' => 'Product updated'],
+                'errors' => [
+                    [
+                        'message' => ['id' => 'invalid_field_value', 'name' => 'Invalid field value'],
+                        'field'   => ['id' => 'packagings'],
+                        'impact'  => ['id' => 'field_ignored'],
+                    ],
+                ],
+                'product' => ['product_name_fr' => 'Eau de Volvic'],
+            ])),
+        ]);
+        $api = $this->createApi($mockHandler);
+        $api->authentification('user', 'secret');
+
+        try {
+            $api->updateProduct('3057640385148', ['product_name_fr' => 'Eau de Volvic', 'packagings' => 'bad']);
+            $this->fail('a partially rejected write must throw');
+        } catch (ProductUpdateException $productUpdateException) {
+            $this->assertStringContainsString('partially failed', $productUpdateException->getMessage());
+            $this->assertStringContainsString('Invalid field value (field: packagings)', $productUpdateException->getMessage());
+            // the envelope stays available: part of the data was saved anyway
+            $this->assertSame('success_with_errors', $productUpdateException->getResponse()['status']);
+        }
+    }
+
+    public function testUpdateProductReturnsOnSuccessWithWarnings(): void
+    {
+        $mockHandler = new MockHandler([
+            new Response(200, ['Content-Type' => 'application/json'], (string) json_encode([
+                'status'   => 'success_with_warnings',
+                'result'   => ['id' => 'product_updated'],
+                'errors'   => [],
+                'warnings' => [['message' => ['id' => 'unexpected_value', 'name' => 'Unexpected value']]],
+            ])),
+        ]);
+        $api = $this->createApi($mockHandler);
+        $api->authentification('user', 'secret');
+
+        $result = $api->updateProduct('3057640385148', ['product_name_fr' => 'Eau de Volvic']);
+        $this->assertSame('success_with_warnings', $result['status']);
+    }
+
+    public function testGetProductSendsProductTypeForCrossFlavorRedirects(): void
+    {
+        $mockHandler = new MockHandler([
+            new Response(200, ['Content-Type' => 'application/json'], self::successEnvelope(['code' => '123'])),
+        ]);
+        $api = $this->createApi($mockHandler);
+
+        $api->getProduct('123', null, null, null, null, 'all');
+
+        $this->assertSame('product_type=all', $this->history[0]['request']->getUri()->getQuery());
+    }
+
+    public function testTestModeUsesBasicGateSeparatedFromAccountCredentials(): void
+    {
+        $mockHandler = new MockHandler([
+            new Response(200, ['Content-Type' => 'application/json'], self::successEnvelope([])),
+        ]);
+        $api = $this->createApi($mockHandler);
+        $api->activeTestMode();
+        $api->authentification('realuser', 'realpass');
+
+        $api->updateProduct('3057640385148', ['product_name_fr' => 'Eau de Volvic']);
+
+        $request = $this->history[0]['request'];
+        $this->assertSame('world.openfoodfacts.net', $request->getUri()->getHost());
+        $this->assertSame('Basic ' . base64_encode('off:off'), $request->getHeaderLine('Authorization'), 'the staging HTTP Basic gate must stay off/off');
+
+        $body = json_decode((string) $request->getBody(), true);
+        $this->assertSame('realuser', $body['user_id'], 'account credentials must come from authentification(), not from the staging gate');
+        $this->assertSame('realpass', $body['password']);
+    }
+
+    public function testUpdateProductInTestModeWithoutAccountCredentialsIsRejectedLocally(): void
+    {
+        $api = $this->createApi(new MockHandler([]));
+        $api->activeTestMode();
+
+        $this->expectException(MissingCredentialsException::class);
+        $api->updateProduct('3057640385148', ['product_name_fr' => 'Eau de Volvic']);
     }
 }
