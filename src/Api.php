@@ -9,8 +9,10 @@ use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\TransferStats;
 use OpenFoodFacts\Exception\BadRequestException;
+use OpenFoodFacts\Exception\InvalidParameterException;
 use OpenFoodFacts\Exception\MissingCredentialsException;
 use OpenFoodFacts\Exception\ProductNotFoundException;
+use OpenFoodFacts\Exception\UnknownException;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
@@ -62,6 +64,19 @@ class Api
     private LoggerInterface $logger;
 
     private ?CacheInterface $cache;
+
+    /**
+     * The version of the Open Food Facts API (and thus of the product schema) that
+     * this SDK requests. Pinning a full version (e.g. "3.6" = product schema 1004)
+     * guarantees a stable response structure even when the server schema evolves.
+     * @link https://openfoodfacts.github.io/openfoodfacts-server/api/ref-api-and-product-schema-change-log/
+     */
+    public const API_VERSION = '3.6';
+
+    /**
+     * Default lifetime (in seconds) of cached API responses
+     */
+    private const CACHE_TTL = 3600;
 
     /**
      * this constant defines the environments usable by the API
@@ -211,24 +226,43 @@ class Api
 
 
     /**
-     * this function search an Document by barcode
-     * @param string $barcode the barcode [\d]{13}
+     * this function search an Document by barcode, using the versioned v3 READ API
+     * @param string $barcode the barcode [\d]{4,14}
+     * @param array<int, string>|null $fields list of fields to include in the response
+     *                                        (special values: "all", "none", "raw", "knowledge_panels").
+     *                                        null returns all fields
+     * @param string|null $lc 2-letter language code used to localize some returned fields
+     * @param string|null $cc 2-letter country code
+     * @param string|null $tagsLc 2-letter language code used to localize taxonomy tags
      * @return Document         A Document if found
      * @throws InvalidArgumentException
+     * @throws InvalidParameterException
      * @throws ProductNotFoundException
      * @throws BadRequestException
+     * @throws UnknownException
      */
-    public function getProduct(string $barcode): Document
+    public function getProduct(string $barcode, ?array $fields = null, ?string $lc = null, ?string $cc = null, ?string $tagsLc = null): Document
     {
-        $url = $this->buildUrl('api', 'product', $barcode);
+        if ($barcode === '' || !ctype_digit($barcode)) {
+            throw new InvalidParameterException(sprintf('Barcode "%s" is invalid: it must only contain digits', $barcode));
+        }
 
-        $rawResult = $this->fetch($url);
-        if ($rawResult['status'] === 0) {
-            //TODO: maybe return null here? (just throw an exception if something really went wrong?
+        $query = array_filter([
+            'fields'  => $fields !== null ? implode(',', $fields) : null,
+            'lc'      => $lc,
+            'cc'      => $cc,
+            'tags_lc' => $tagsLc,
+        ], static fn ($value) => $value !== null);
+
+        $url = sprintf('%s/api/v%s/product/%s', $this->geoUrl, self::API_VERSION, rawurlencode($barcode));
+
+        $result = $this->fetchV3('get', $url, ['query' => $query], true);
+
+        if (($result['status'] ?? '') === 'failure' || !isset($result['product']) || !is_array($result['product'])) {
             throw new ProductNotFoundException('Product not found', 1);
         }
 
-        return Document::createSpecificDocument($this->currentAPI, $rawResult['product']);
+        return Document::createSpecificDocument($this->currentAPI, $result['product']);
     }
 
     /**
@@ -258,7 +292,64 @@ class Api
     }
 
     /**
+     * Create or update a product through the structured v3 WRITE API (PATCH).
+     *
+     * The v3 WRITE API accepts structured JSON data instead of the flattened
+     * key/value pairs of the legacy cgi API. Currently supported fields are the
+     * language specific fields (product_name, ingredients text, ...), tags fields
+     * (categories, labels, ...), packaging fields (packagings, packagings_add,
+     * packagings_complete) and the selection of uploaded images.
+     *
+     * @param string $barcode the barcode of the product to create or update
+     * @param array $productData the structured product data (content of the "product" body field)
+     * @param array<int, string>|null $fields fields to return in the response ("updated" by default)
+     * @param string|null $lc 2-letter language code
+     * @param string|null $cc 2-letter country code
+     * @param string|null $tagsLc 2-letter language code for taxonomy tags
+     * @return array the v3 response envelope (status, result, errors, warnings, product)
+     * @throws BadRequestException
+     * @throws InvalidParameterException
+     * @throws MissingCredentialsException
+     * @throws ProductNotFoundException
+     * @throws UnknownException
+     */
+    public function updateProduct(string $barcode, array $productData, ?array $fields = null, ?string $lc = null, ?string $cc = null, ?string $tagsLc = null): array
+    {
+        if ($barcode === '' || !ctype_digit($barcode)) {
+            throw new InvalidParameterException(sprintf('Barcode "%s" is invalid: it must only contain digits', $barcode));
+        }
+        if (null === $this->auth) {
+            throw new MissingCredentialsException('The v3 WRITE API requires credentials: call authentification() first');
+        }
+
+        $body = array_filter([
+            'lc'      => $lc,
+            'cc'      => $cc,
+            'tags_lc' => $tagsLc,
+            'fields'  => $fields !== null ? implode(',', $fields) : null,
+        ], static fn ($value) => $value !== null);
+        $body['user_id']  = $this->auth['user_id'];
+        $body['password'] = $this->auth['password'];
+        $body['product']  = $productData;
+
+        $url = sprintf('%s/api/v%s/product/%s', $this->geoUrl, self::API_VERSION, rawurlencode($barcode));
+
+        $result = $this->fetchV3('patch', $url, ['json' => $body]);
+
+        if (($result['status'] ?? '') === 'failure') {
+            throw new BadRequestException(sprintf(
+                'Product update failed: %s',
+                $this->formatV3Errors($result)
+            ));
+        }
+
+        return $result;
+    }
+
+    /**
      * this function help you to add a new product (or update ??)
+     * @deprecated use updateProduct() (structured v3 WRITE API) instead;
+     *             this method relies on the legacy cgi/product_jqm2.pl endpoint
      * @param array $postData The post data
      * @return bool|string bool if the product has been added or the error message
      * @throws BadRequestException
@@ -285,42 +376,70 @@ class Api
     }
 
     /**
-     * [uploadImage description]
+     * Upload an image for a product through the v3 images API and optionally
+     * select it for a specific information field and language.
+     *
+     * The image is sent base64 encoded in a JSON body (endpoint introduced by
+     * API v3.3: POST /api/v3/product/[barcode]/images). If the product does not
+     * exist, it will be created.
+     *
      * @param string $code the barcode of the product
-     * @param string $imageField th name of the image
-     * @param string $imagePath the path of the image
-     * @return array             the http post response (cast in array)
+     * @param string $imageField the information shown on the image (front, ingredients, nutrition, packaging),
+     *                           used to select the uploaded image; pass an empty string to only upload
+     * @param string $imagePath the path of the image (JPEG, PNG, GIF or HEIC)
+     * @param string $imageLc 2-letter code of the language shown on the image, used for the selection
+     * @return array             the v3 response envelope (status, result, errors, warnings, product)
      * @throws BadRequestException
-     * @throws InvalidArgumentException
+     * @throws InvalidParameterException
+     * @throws MissingCredentialsException
+     * @throws ProductNotFoundException
+     * @throws UnknownException
      */
-    public function uploadImage(string $code, string $imageField, string $imagePath)
+    public function uploadImage(string $code, string $imageField, string $imagePath, string $imageLc = 'en'): array
     {
-        //TODO : need test
-        if ($this->currentAPI !== 'food') {
-            throw new BadRequestException('not Available yet');
+        if ($code === '' || !ctype_digit($code)) {
+            throw new InvalidParameterException(sprintf('Barcode "%s" is invalid: it must only contain digits', $code));
         }
-        if (!in_array($imageField, ['front', 'ingredients', 'nutrition'])) {
+        if ($imageField !== '' && !in_array($imageField, ['front', 'ingredients', 'nutrition', 'packaging'], true)) {
             throw new BadRequestException('ImageField not valid!');
         }
         if (!file_exists($imagePath)) {
             throw new BadRequestException('Image not found');
         }
-
-
-        $url = $this->buildUrl('cgi', 'product_image_upload.pl', []);
-        $postData = [
-            'code'                      => $code,
-            'imagefield'                => $imageField,
-            'imgupload_' . $imageField  => fopen($imagePath, 'r')
-        ];
-
-        try {
-            return $this->fetchPost($url, $postData, true);
-        } finally {
-            if (is_resource($postData['imgupload_' . $imageField])) {
-                fclose($postData['imgupload_' . $imageField]);
-            }
+        if (null === $this->auth) {
+            throw new MissingCredentialsException('The v3 images API requires credentials: call authentification() first');
         }
+
+        $imageContent = file_get_contents($imagePath);
+        if ($imageContent === false) {
+            throw new BadRequestException('Image not readable');
+        }
+
+        $body = [
+            'user_id'           => $this->auth['user_id'],
+            'password'          => $this->auth['password'],
+            'image_data_base64' => base64_encode($imageContent),
+        ];
+        if ($imageField !== '') {
+            $body['selected'] = [
+                $imageField => [
+                    $imageLc => new \stdClass(),
+                ],
+            ];
+        }
+
+        $url = sprintf('%s/api/v%s/product/%s/images', $this->geoUrl, self::API_VERSION, rawurlencode($code));
+
+        $result = $this->fetchV3('post', $url, ['json' => $body]);
+
+        if (($result['status'] ?? '') === 'failure') {
+            throw new BadRequestException(sprintf(
+                'Image upload failed: %s',
+                $this->formatV3Errors($result)
+            ));
+        }
+
+        return $result;
     }
 
     /**
@@ -435,11 +554,13 @@ class Api
         }
         $this->logger->info('OpenFoodFact - fetch - GET : ' . $url . ' - ' . $response->getStatusCode());
 
-        /** @var array $jsonResult */
-        $jsonResult = json_decode($response->getBody(), true);
+        $jsonResult = json_decode((string) $response->getBody(), true);
+        if (!is_array($jsonResult)) {
+            throw new BadRequestException(sprintf('OpenFoodFact - the API returned a non-JSON response (HTTP %d)', $response->getStatusCode()));
+        }
 
         if (!empty($this->cache) && !empty($jsonResult)) {
-            $this->cache->set($cacheKey, $jsonResult);
+            $this->cache->set($cacheKey, $jsonResult, self::CACHE_TTL);
         }
 
         return $jsonResult;
@@ -469,12 +590,6 @@ class Api
             $data['form_params'] = $postData;
         }
 
-        $cacheKey = hash('sha256', $url . json_encode($data));
-
-        if (!empty($this->cache) && $this->cache->has($cacheKey)) {
-            return $this->cache->get($cacheKey);
-        }
-
         try {
             $response = $this->httpClient->request('post', $url, $data);
         } catch (GuzzleException $guzzleException) {
@@ -483,15 +598,121 @@ class Api
             throw $exception;
         }
 
-        $this->logger->info('OpenFoodFact - fetch - GET : ' . $url . ' - ' . $response->getStatusCode());
+        $this->logger->info('OpenFoodFact - fetch - POST : ' . $url . ' - ' . $response->getStatusCode());
 
-        $jsonResult = json_decode($response->getBody(), true);
-
-        if (!empty($this->cache) && !empty($jsonResult)) {
-            $this->cache->set($cacheKey, $jsonResult);
+        $jsonResult = json_decode((string) $response->getBody(), true);
+        if (!is_array($jsonResult)) {
+            throw new BadRequestException(sprintf('OpenFoodFact - the API returned a non-JSON response (HTTP %d)', $response->getStatusCode()));
         }
 
         return $jsonResult;
+    }
+
+    /**
+     * Perform a request against a versioned v3 endpoint and decode the common
+     * v3 response envelope (status, result, errors, warnings).
+     *
+     * HTTP errors are handled here: a 404 throws ProductNotFoundException (the
+     * v3 READ API returns a 404 status code when the product does not exist),
+     * other client/server errors throw BadRequestException. Redirects (302 to
+     * the server matching the product type) are followed transparently.
+     *
+     * @param string $method the http method (get, post, patch)
+     * @param string $url the versioned v3 url
+     * @param array $options additional Guzzle options (query, json, ...)
+     * @param bool $useCache whether the response may be served from/stored in the cache (READ only)
+     * @return array the decoded v3 response envelope
+     * @throws BadRequestException
+     * @throws InvalidArgumentException
+     * @throws ProductNotFoundException
+     * @throws UnknownException
+     */
+    private function fetchV3(string $method, string $url, array $options = [], bool $useCache = false): array
+    {
+        $cacheKey = hash('sha256', $method . ' ' . $url . '?' . http_build_query($options['query'] ?? []));
+        if ($useCache && !empty($this->cache) && $this->cache->has($cacheKey)) {
+            /** @var array $cachedResult */
+            $cachedResult = $this->cache->get($cacheKey);
+
+            return $cachedResult;
+        }
+
+        $options             = array_merge($this->getDefaultOptions(), $options);
+        $options['http_errors'] = false;
+
+        try {
+            $response = $this->httpClient->request($method, $url, $options);
+        } catch (GuzzleException $guzzleException) {
+            $this->logger->warning(sprintf('OpenFoodFact - fetchV3 - failed - %s : %s', strtoupper($method), $url), ['exception' => $guzzleException]);
+
+            throw new BadRequestException($guzzleException->getMessage(), $guzzleException->getCode(), $guzzleException);
+        }
+
+        $statusCode = $response->getStatusCode();
+        $this->logger->info(sprintf('OpenFoodFact - fetchV3 - %s : %s - %d', strtoupper($method), $url, $statusCode));
+
+        try {
+            $decoded = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $jsonException) {
+            if ($statusCode === 404) {
+                throw new ProductNotFoundException('Product not found', 1);
+            }
+
+            throw new UnknownException(
+                sprintf('OpenFoodFact - the API returned a non-JSON response (HTTP %d)', $statusCode),
+                $statusCode,
+                $jsonException
+            );
+        }
+        if (!is_array($decoded)) {
+            throw new UnknownException(sprintf('OpenFoodFact - the API returned an unexpected JSON payload (HTTP %d)', $statusCode));
+        }
+
+        if ($statusCode === 404) {
+            throw new ProductNotFoundException('Product not found', 1);
+        }
+        if ($statusCode >= 400) {
+            throw new BadRequestException(sprintf(
+                'OpenFoodFact - the API returned an error (HTTP %d): %s',
+                $statusCode,
+                $this->formatV3Errors($decoded)
+            ), $statusCode);
+        }
+
+        if ($useCache && !empty($this->cache)) {
+            $this->cache->set($cacheKey, $decoded, self::CACHE_TTL);
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * Build a readable message from the errors of a v3 response envelope
+     * @param array $result the decoded v3 response envelope
+     * @return string
+     */
+    private function formatV3Errors(array $result): string
+    {
+        $messages = [];
+        foreach ((array) ($result['errors'] ?? []) as $error) {
+            if (!is_array($error)) {
+                continue;
+            }
+            $message  = is_array($error['message'] ?? null) ? $error['message'] : [];
+            $field    = is_array($error['field'] ?? null) ? $error['field'] : [];
+            $sentence = $message['name'] ?? $message['id'] ?? null;
+            if (is_string($sentence)) {
+                $messages[] = $sentence . (isset($field['id']) && is_string($field['id']) ? sprintf(' (field: %s)', $field['id']) : '');
+            }
+        }
+        if ($messages === []) {
+            $resultInfo = is_array($result['result'] ?? null) ? $result['result'] : [];
+            $fallback   = $resultInfo['name'] ?? $resultInfo['id'] ?? null;
+
+            return is_string($fallback) ? $fallback : 'unknown error';
+        }
+
+        return implode('; ', $messages);
     }
 
     /**
@@ -505,17 +726,6 @@ class Api
     {
         $baseUrl = null;
         switch ($service) {
-            case 'api':
-                /** @phpstan-ignore-next-line */
-                $baseUrl = implode('/', [
-                    $this->geoUrl,
-                    $service ?? '',
-                    'v0',
-                    $resourceType,
-                    $parameters
-                ]);
-
-                break;
             case 'data':
                 /** @phpstan-ignore-next-line */
                 $baseUrl = implode('/', [
