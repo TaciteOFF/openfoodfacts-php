@@ -1,0 +1,9 @@
+/vendor/
+/.env
+/.phpunit.cache/
+.DS_Store
+
+# The wrapper's root .gitignore excludes composer.lock, which is the right call for a library.
+# This example is an application: its lock file is committed on purpose, because it pins the
+# exact revision of the fork the demo was tested and deployed with.
+!composer.lock

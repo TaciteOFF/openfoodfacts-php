@@ -1,0 +1,17 @@
+# Render blueprint for the openfoodfacts-php demo.
+# Create the service with "New > Blueprint" and point it at this repository.
+#
+# numInstances stays at 1 on purpose: PHP sessions live on the instance filesystem, so a second
+# instance would break CSRF, stored credentials and the per-session rate limiter. Scaling out
+# means moving sessions to Redis first (see the Deployment section of the README).
+services:
+  - type: web
+    name: openfoodfacts-php-demo
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    numInstances: 1
+    envVars:
+      # Identify your deployment to Open Food Facts, with a real contact point.
+      - key: OFF_USER_AGENT
+        sync: false

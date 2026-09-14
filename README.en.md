@@ -8,6 +8,8 @@ This fork migrates the wrapper to the **Open Food Facts API v3.6** (product sche
 
 📖 **Full documentation: [doc/home.en.md](doc/home.en.md)** — this README focuses on the differences from upstream.
 
+🚀 **Live demo: [openfoodfacts-php-demo.fly.dev](https://openfoodfacts-php-demo.fly.dev/)** — a playground for the wrapper: full product read, search, language switching, and the raw JSON response the SDK returns. Editing and photo upload are available on the staging server with a contributor account. Interface in French and English. Full source: [`examples/02_demo`](examples/02_demo).
+
 ## Installation
 
 The fork is not published on Packagist: install it through a VCS repository in your `composer.json`:

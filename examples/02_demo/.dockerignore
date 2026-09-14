@@ -1,0 +1,11 @@
+# Build context: only what the image actually needs.
+.git
+.gitignore
+.DS_Store
+vendor
+tests
+node_modules
+*.md
+fly.toml
+render.yaml
+railway.json

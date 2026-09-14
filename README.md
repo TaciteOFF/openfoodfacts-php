@@ -8,6 +8,8 @@ Ce fork migre le wrapper vers l'**API Open Food Facts v3.6** (schéma produit 10
 
 📖 **Documentation complète : [doc/home.md](doc/home.md)** — ce README se concentre sur les différences avec l'upstream.
 
+🚀 **Démo en ligne : [openfoodfacts-php-demo.fly.dev](https://openfoodfacts-php-demo.fly.dev/)** — interface de test du wrapper : lecture complète d'un produit, recherche, changement de langue, et la réponse JSON brute renvoyée par le SDK. Édition et upload de photos disponibles sur le serveur de staging avec un compte contributeur. Interface en français et en anglais. Code source complet : [`examples/02_demo`](examples/02_demo).
+
 ## Installation
 
 Le fork n'est pas publié sur Packagist : installez-le via un dépôt VCS dans votre `composer.json` :

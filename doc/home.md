@@ -6,6 +6,8 @@ Wrapper PHP pour les API [Open Food Facts](https://world.openfoodfacts.org/), [O
 
 Ce fork utilise l'**API v3.6** (schéma produit 1004) pour la lecture, l'écriture et l'upload d'images produit. Les différences avec l'upstream sont listées dans le [README](../README.md).
 
+Pour essayer les méthodes décrites ici sans écrire une ligne de code : **[démo en ligne](https://openfoodfacts-php-demo.fly.dev/)** — chaque appel y affiche la réponse JSON brute du wrapper. Son code source est dans [`examples/02_demo`](../examples/02_demo).
+
 ## Sommaire
 
 - [Installation](#installation)
