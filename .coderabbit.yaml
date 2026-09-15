@@ -1,4 +1,10 @@
 reviews:
+  high_level_summary: false
+  review_status: false
+  review_progress: false
+  commit_status: false
+  slop_detection:
+    enabled: false
   auto_review:
     enabled: false
     auto_incremental_review: false
