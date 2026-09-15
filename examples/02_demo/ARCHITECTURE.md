@@ -99,7 +99,7 @@ error, 500 anything else.
 - **Writes cannot reach production.** Three independent layers: the UI renders no edit control
   outside staging; `api.php` returns 403 for `update`/`upload` when the session is not in
   staging; and a Guzzle middleware throws on any non-GET/HEAD request whose destination is not
-  `https://world.openfoodfacts.net`, which also covers redirects. The last layer is what the
+  `https://fr.openfoodfacts.net` or `https://world.openfoodfacts.net`, which also covers redirects. The last layer is what the
   integration suite asserts with a 307 pointing at production.
 - **Write allow-list**: `validateProductPatch()` runs before the wrapper is called. Unknown
   fields, computed fields (`nova-group`, scores), read-only tags and aggregated nutrition are

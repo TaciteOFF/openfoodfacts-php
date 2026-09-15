@@ -166,7 +166,7 @@ file_put_contents($file,base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1H
 try {
     $api->uploadImage('3057640385148','front',$file,'fr');
     $r=$history[1]['request'];$body=json_decode((string)$r->getBody(),true);
-    check($r->getUri()->getHost()==='world.openfoodfacts.net','upload envoyé au staging par le wrapper');
+    check($r->getUri()->getHost()==='fr.openfoodfacts.net','upload envoyé au staging français par le wrapper');
     check($r->getHeaderLine('Authorization')==='Basic '.base64_encode('off:off'),'protection HTTP Basic staging distincte');
     check($body['user_id']==='fixture-user' && $body['password']==='fixture-password','identifiants contributeur conservés en staging');
     check(isset($body['selected']['front']['fr']) && base64_decode($body['image_data_base64'])===file_get_contents($file),'photo base64, type et langue transmis');
@@ -180,7 +180,7 @@ try {
     check($history[4]['request']->getHeaderLine('X-User-Agent')==='Existing-App/2.0','X-User-Agent existant conservé indépendamment de la casse');
     $api->updateProduct('3057640385148',validateProductPatch($patch),['all'],'en',null,'en');
     $r=$history[5]['request'];$body=json_decode((string)$r->getBody(),true);
-    check($r->getMethod()==='PATCH' && $r->getUri()->getHost()==='world.openfoodfacts.net','updateProduct PATCH envoyé exclusivement au staging');
+    check($r->getMethod()==='PATCH' && $r->getUri()->getHost()==='fr.openfoodfacts.net','updateProduct PATCH envoyé exclusivement au staging français');
     check($body['product']===$patch,'patch du wrapper préserve langues, labels vides et zéro value_string');
     check($body['lc']==='en' && $body['tags_lc']==='en','langue de réponse et de tags transmise');
     check($body['user_id']==='fixture-user' && $body['password']==='fixture-password' && $r->getHeaderLine('Authorization')==='Basic '.base64_encode('off:off'),'authentification staging de la modification');

@@ -22,12 +22,12 @@ The fork is not published on Packagist: install it through a VCS repository in y
     { "type": "vcs", "url": "https://github.com/TaciteOFF/openfoodfacts-php" }
   ],
   "require": {
-    "taciteoff/openfoodfacts-php": "dev-develop"
+    "taciteoff/openfoodfacts-php": "^1.1"
   }
 }
 ```
 
-The fork’s Composer name is `taciteoff/openfoodfacts-php`; PHP namespaces remain `OpenFoodFacts\`. Remove the old `openfoodfacts/openfoodfacts-php` dependency when migrating: the two packages cannot coexist. Existing tags retain the old name; once these changes are published on `develop`, use `dev-develop` until a new tag is available.
+The fork’s Composer name is `taciteoff/openfoodfacts-php`; PHP namespaces remain `OpenFoodFacts\`. Remove the old `openfoodfacts/openfoodfacts-php` dependency when migrating: the two packages cannot coexist. The new name is available from version 1.1.0; earlier tags retain the old name.
 
 ## Quick start
 

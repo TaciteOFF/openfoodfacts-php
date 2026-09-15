@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.1.0](https://github.com/TaciteOFF/openfoodfacts-php/compare/v1.0.0...v1.1.0) (2026-09-15)
+
+### Migration
+
+* Rename the Composer package to `taciteoff/openfoodfacts-php`. Replace the old dependency with `taciteoff/openfoodfacts-php:^1.1`; PHP namespaces remain `OpenFoodFacts\`. The fork and upstream package cannot be installed together.
+* Limit image files to 10 MiB before base64 encoding; reject empty and non-regular files locally.
+
+### Fixes and improvements
+
+* Preserve the selected flavor and geography when enabling staging mode, with separate HTTP Basic and contributor credentials.
+* Bound image reads and add a common `ApiException` base while preserving existing exception handlers.
+* Exclude examples, the demo, tests, dependencies and development configuration from distribution archives.
+* Verify cache isolation across environments and flavors; remove the test helper cache that mixed production and staging data.
+* Add PHP 8.5 to CI, restrict workflow permissions and remove PHPUnit notices from unnecessary mocks.
+* Clarify that product reads, writes and image uploads use v3.6 while search and facets keep their existing endpoints.
+* Update the French and English documentation, publish the demo source, modernize examples and update the demo to the renamed package.
+
+### Validation
+
+* PHPUnit on PHP 8.5: 71 tests, 215 assertions, no failures or notices; 4 pre-existing incomplete tests and 2 skipped tests.
+* PHPStan level 8 and strict Composer validation pass.
+* GitHub Actions passes on PHP 8.1, 8.2, 8.3, 8.4 and 8.5; the demo PHP and JavaScript suites pass with the renamed package.
+
 ## [1.0.0](https://github.com/TaciteOFF/openfoodfacts-php/compare/v0.4.0...v1.0.0) (2026-08-19)
 
 

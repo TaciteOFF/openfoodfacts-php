@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "312db4663d9cec7587fbbdaced7eaad4",
+    "content-hash": "a9a8a52a214f6fc52dfaf3a90e05bafa",
     "packages": [
         {
             "name": "guzzlehttp/guzzle",
@@ -336,80 +336,6 @@
                 }
             ],
             "time": "2026-08-24T09:13:11+00:00"
-        },
-        {
-            "name": "openfoodfacts/openfoodfacts-php",
-            "version": "dev-develop",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/TaciteOFF/openfoodfacts-php.git",
-                "reference": "904610244d980d48359ba062138842e6fde8c151"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/TaciteOFF/openfoodfacts-php/zipball/904610244d980d48359ba062138842e6fde8c151",
-                "reference": "904610244d980d48359ba062138842e6fde8c151",
-                "shasum": ""
-            },
-            "require": {
-                "ext-json": "*",
-                "guzzlehttp/guzzle": "^7.4",
-                "php": "^8.1",
-                "psr/log": "^3.0",
-                "psr/simple-cache": "^3.0"
-            },
-            "require-dev": {
-                "ext-gd": "*",
-                "phpstan/phpstan": "^2.1",
-                "phpstan/phpstan-phpunit": "^2.0",
-                "phpunit/phpunit": "^10.5 || ^11.5 || ^12.0",
-                "symfony/cache": "^6.4 || ^7.0"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "OpenFoodFacts\\": "src/"
-                }
-            },
-            "autoload-dev": {
-                "psr-4": {
-                    "OpenFoodFactsTests\\": "tests/"
-                }
-            },
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Roberto Moreno",
-                    "email": "rmorenp@rampmaster.org",
-                    "homepage": "https://rampmaster.org/",
-                    "role": "Wrapper Developer"
-                },
-                {
-                    "name": "Colin Benoit",
-                    "homepage": "https://github.com/Benoit382",
-                    "role": "PHP Developer"
-                }
-            ],
-            "description": "Open Food Facts API Wrapper (API v3.6), the open database about food.",
-            "homepage": "https://world.openfoodfacts.org/",
-            "keywords": [
-                "api",
-                "food",
-                "nutrition",
-                "open-data",
-                "openfoodfacts",
-                "sdk"
-            ],
-            "support": {
-                "issues": "https://github.com/TaciteOFF/openfoodfacts-php/issues",
-                "chat": "https://slack.openfoodfacts.org/",
-                "source": "https://github.com/TaciteOFF/openfoodfacts-php",
-                "docs": "https://github.com/TaciteOFF/openfoodfacts-php/blob/develop/doc/home.md"
-            },
-            "time": "2026-08-19T20:12:16+00:00"
         },
         {
             "name": "psr/http-client",
@@ -870,13 +796,106 @@
                 }
             ],
             "time": "2026-04-10T16:19:22+00:00"
+        },
+        {
+            "name": "taciteoff/openfoodfacts-php",
+            "version": "dev-develop",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/TaciteOFF/openfoodfacts-php.git",
+                "reference": "44fe2b09edeec73b066a8e43e3cabfe44ab62fb9"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/TaciteOFF/openfoodfacts-php/zipball/44fe2b09edeec73b066a8e43e3cabfe44ab62fb9",
+                "reference": "44fe2b09edeec73b066a8e43e3cabfe44ab62fb9",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "guzzlehttp/guzzle": "^7.4",
+                "php": "^8.1",
+                "psr/log": "^3.0",
+                "psr/simple-cache": "^3.0"
+            },
+            "conflict": {
+                "openfoodfacts/openfoodfacts-php": "*"
+            },
+            "require-dev": {
+                "ext-gd": "*",
+                "phpstan/phpstan": "^2.1",
+                "phpstan/phpstan-phpunit": "^2.0",
+                "phpunit/phpunit": "^10.5 || ^11.5 || ^12.0",
+                "symfony/cache": "^6.4 || ^7.0"
+            },
+            "default-branch": true,
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "OpenFoodFacts\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "OpenFoodFactsTests\\": "tests/"
+                }
+            },
+            "archive": {
+                "exclude": [
+                    "/examples",
+                    "/tests",
+                    "/build",
+                    "/vendor",
+                    "/.github",
+                    "/.gitattributes",
+                    "/.gitignore",
+                    "/composer.lock",
+                    "/phpunit.xml",
+                    "/phpstan.neon.dist",
+                    "/.phpunit.result.cache",
+                    ".DS_Store"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Roberto Moreno",
+                    "email": "rmorenp@rampmaster.org",
+                    "homepage": "https://rampmaster.org/",
+                    "role": "Wrapper Developer"
+                },
+                {
+                    "name": "Colin Benoit",
+                    "homepage": "https://github.com/Benoit382",
+                    "role": "PHP Developer"
+                }
+            ],
+            "description": "Open Food Facts API Wrapper (API v3.6), the open database about food.",
+            "homepage": "https://world.openfoodfacts.org/",
+            "keywords": [
+                "api",
+                "food",
+                "nutrition",
+                "open-data",
+                "openfoodfacts",
+                "sdk"
+            ],
+            "support": {
+                "issues": "https://github.com/TaciteOFF/openfoodfacts-php/issues",
+                "chat": "https://slack.openfoodfacts.org/",
+                "source": "https://github.com/TaciteOFF/openfoodfacts-php",
+                "docs": "https://github.com/TaciteOFF/openfoodfacts-php/blob/develop/doc/home.md"
+            },
+            "time": "2026-09-15T14:38:05+00:00"
         }
     ],
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "openfoodfacts/openfoodfacts-php": 20
+        "taciteoff/openfoodfacts-php": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,

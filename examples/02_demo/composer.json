@@ -4,7 +4,7 @@
   "type": "project",
   "license": "MIT",
   "repositories": [{ "type": "vcs", "url": "https://github.com/TaciteOFF/openfoodfacts-php" }],
-  "require": { "php": "^8.1", "ext-fileinfo": "*", "openfoodfacts/openfoodfacts-php": "dev-develop" },
+  "require": { "php": "^8.1", "ext-fileinfo": "*", "taciteoff/openfoodfacts-php": "dev-develop" },
   "config": { "sort-packages": true },
   "scripts": { "start": "php -d upload_max_filesize=6M -d post_max_size=8M -S 127.0.0.1:8080 -t public", "test": "php tests/integration.php" }
 }

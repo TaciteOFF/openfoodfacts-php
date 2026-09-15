@@ -28,7 +28,7 @@ Pour essayer les méthodes décrites ici sans écrire une ligne de code : **[dé
 
 ## Installation
 
-Le nom Composer du fork est `taciteoff/openfoodfacts-php` ; les namespaces PHP restent `OpenFoodFacts\`. Retirez l’ancienne dépendance `openfoodfacts/openfoodfacts-php` avant migration : les deux packages ne peuvent pas cohabiter. Les tags existants gardent l’ancien nom ; après publication de ces changements sur `develop`, utilisez `dev-develop` en attendant un nouveau tag.
+Le nom Composer du fork est `taciteoff/openfoodfacts-php` ; les namespaces PHP restent `OpenFoodFacts\`. Retirez l’ancienne dépendance `openfoodfacts/openfoodfacts-php` avant migration : les deux packages ne peuvent pas cohabiter. Le nouveau nom est disponible à partir de la version 1.1.0 ; les tags antérieurs gardent l’ancien nom.
 
 ```json
 {
@@ -36,7 +36,7 @@ Le nom Composer du fork est `taciteoff/openfoodfacts-php` ; les namespaces PHP r
     { "type": "vcs", "url": "https://github.com/TaciteOFF/openfoodfacts-php" }
   ],
   "require": {
-    "taciteoff/openfoodfacts-php": "dev-develop"
+    "taciteoff/openfoodfacts-php": "^1.1"
   }
 }
 ```

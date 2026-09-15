@@ -137,7 +137,7 @@ function barcode(array $data): string {
  *  - network timeouts (25 s total, 8 s connect) so a slow OFF response cannot hang PHP-FPM;
  *  - an `X-User-Agent` header identifying this deployment (see the OFF_USER_AGENT env var);
  *  - a Guzzle middleware that rejects any non GET/HEAD request whose destination is not
- *    `https://world.openfoodfacts.net`, i.e. a hard, transport-level guarantee that no write
+ *    `https://fr.openfoodfacts.net` or `https://world.openfoodfacts.net`, so no write
  *    can reach production, even after an unexpected redirect.
  *
  * Session state is applied last: staging mode via `activeTestMode()`, then credentials via
@@ -147,7 +147,7 @@ function api(): OpenFoodFacts\Api {
     $userAgent = getenv('OFF_USER_AGENT') ?: 'openfoodfacts-php-demo/1.0 (+https://github.com/TaciteOFF/openfoodfacts-php)';
     $handler = GuzzleHttp\HandlerStack::create();
     $handler->push(GuzzleHttp\Middleware::mapRequest(static function (Psr\Http\Message\RequestInterface $request) {
-        if (!in_array($request->getMethod(), ['GET', 'HEAD'], true) && ($request->getUri()->getScheme() !== 'https' || $request->getUri()->getHost() !== 'world.openfoodfacts.net')) {
+        if (!in_array($request->getMethod(), ['GET', 'HEAD'], true) && ($request->getUri()->getScheme() !== 'https' || !in_array($request->getUri()->getHost(), ['fr.openfoodfacts.net', 'world.openfoodfacts.net'], true))) {
             throw new InvalidArgumentException(t('err.write_blocked'));
         }
         return $request;
