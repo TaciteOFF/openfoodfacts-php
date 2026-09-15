@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/TaciteOFF/openfoodfacts-php/compare/v1.0.0...v1.0.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* harden staging, image uploads and package distribution ([44fe2b0](https://github.com/TaciteOFF/openfoodfacts-php/commit/44fe2b09edeec73b066a8e43e3cabfe44ab62fb9))
+
 ## [1.0.0](https://github.com/TaciteOFF/openfoodfacts-php/compare/v0.4.0...v1.0.0) (2026-08-19)
 
 
