@@ -1,0 +1,9 @@
+reviews:
+  auto_review:
+    enabled: false
+    auto_incremental_review: false
+chat:
+  auto_reply: false
+issue_enrichment:
+  auto_enrich:
+    enabled: false

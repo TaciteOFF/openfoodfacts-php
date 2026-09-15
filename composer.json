@@ -35,6 +35,7 @@
       "/build",
       "/vendor",
       "/.github",
+      "/.coderabbit.yaml",
       "/.gitattributes",
       "/.gitignore",
       "/composer.lock",
