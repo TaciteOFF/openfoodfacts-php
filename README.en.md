@@ -4,11 +4,13 @@
 
 Fork of [openfoodfacts/openfoodfacts-php](https://github.com/openfoodfacts/openfoodfacts-php), the PHP wrapper for [Open Food Facts](https://openfoodfacts.org/), the open database about food products.
 
-This fork migrates the wrapper to the **Open Food Facts API v3.6** (product schema 1004) and fixes several robustness bugs present in the upstream version (v0.4.0), which is still on the legacy v0 API.
+This fork migrates product reads, writes and image uploads to the **Open Food Facts API v3.6** (product schema 1004) and fixes several robustness bugs present in the upstream version (v0.4.0), which is still on the legacy v0 API.
 
 📖 **Full documentation: [doc/home.en.md](doc/home.en.md)** — this README focuses on the differences from upstream.
 
 🚀 **Live demo: [openfoodfacts-php-demo.fly.dev](https://openfoodfacts-php-demo.fly.dev/)** — a playground for the wrapper: full product read, search, language switching, and the raw JSON response the SDK returns. Editing and photo upload are available on the staging server with a contributor account. Interface in French and English. Full source: [`examples/02_demo`](examples/02_demo).
+
+The v3 migration covers products and their images. `Api::search()` still uses `cgi/search.pl`; `getByFacets()` and facet accessors use the website’s `.json` URLs. There is no v3 search endpoint: see the [official API feature matrix](https://openfoodfacts.github.io/documentation/docs/Product-Opener/api/). The separate `SearchApi` client exposes Search-a-licious.
 
 ## Installation
 
@@ -20,12 +22,12 @@ The fork is not published on Packagist: install it through a VCS repository in y
     { "type": "vcs", "url": "https://github.com/TaciteOFF/openfoodfacts-php" }
   ],
   "require": {
-    "openfoodfacts/openfoodfacts-php": "^1.0"
+    "taciteoff/openfoodfacts-php": "dev-develop"
   }
 }
 ```
 
-(or `"dev-develop"` to track the development branch)
+The fork’s Composer name is `taciteoff/openfoodfacts-php`; PHP namespaces remain `OpenFoodFacts\`. Remove the old `openfoodfacts/openfoodfacts-php` dependency when migrating: the two packages cannot coexist. Existing tags retain the old name; once these changes are published on `develop`, use `dev-develop` until a new tag is available.
 
 ## Quick start
 
@@ -87,9 +89,9 @@ Implementation details:
 
 ## Compatibility
 
-- PHP **8.1 → 8.4** (no syntax beyond 8.1; notably tested on 8.3).
+- PHP **8.1 → 8.5** (no syntax beyond 8.1; notably tested on 8.3).
 - Unchanged runtime dependencies: Guzzle 7, PSR-3, PSR-16.
-- Public API backward compatible, with three exceptions: `uploadImage()` now returns the v3 envelope and works for all flavors; non-numeric barcodes are rejected; `activeTestMode()` now only sets `off`/`off` as the `.net` htaccess — to write on staging, provide a contributor account through `authentification()`.
+- Public API backward compatible, with the following changes: `uploadImage()` limits files to 10 MiB before encoding, now returns the v3 envelope and works for all flavors; non-numeric barcodes are rejected; `activeTestMode()` now only sets `off`/`off` as the `.net` htaccess — to write on staging, provide a contributor account through `authentification()`.
 - The new exceptions (`InvalidParameterException`, `UnknownException`, `ProductUpdateException`) extend `BadRequestException`: a `catch (BadRequestException)` written against upstream keeps catching them.
 
 ## License and credits

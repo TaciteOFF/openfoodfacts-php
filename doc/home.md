@@ -28,18 +28,20 @@ Pour essayer les méthodes décrites ici sans écrire une ligne de code : **[dé
 
 ## Installation
 
+Le nom Composer du fork est `taciteoff/openfoodfacts-php` ; les namespaces PHP restent `OpenFoodFacts\`. Retirez l’ancienne dépendance `openfoodfacts/openfoodfacts-php` avant migration : les deux packages ne peuvent pas cohabiter. Les tags existants gardent l’ancien nom ; après publication de ces changements sur `develop`, utilisez `dev-develop` en attendant un nouveau tag.
+
 ```json
 {
   "repositories": [
     { "type": "vcs", "url": "https://github.com/TaciteOFF/openfoodfacts-php" }
   ],
   "require": {
-    "openfoodfacts/openfoodfacts-php": "^1.0"
+    "taciteoff/openfoodfacts-php": "dev-develop"
   }
 }
 ```
 
-Prérequis : PHP ≥ 8.1 (testé jusqu'à 8.4), extension `json`.
+Prérequis : PHP ≥ 8.1 (testé jusqu'à 8.5), extension `json`.
 
 ## Le client `Api`
 
@@ -132,7 +134,7 @@ $result = $api->uploadImage('3057640385148', 'front', '/chemin/photo.jpg', 'fr')
 $result = $api->uploadImage('3057640385148', '', '/chemin/photo.jpg');
 ```
 
-Champs de sélection valides : `front`, `ingredients`, `nutrition`, `packaging`. Formats : JPEG, PNG, GIF, HEIC. Fonctionne pour tous les flavors.
+Champs de sélection valides : `front`, `ingredients`, `nutrition`, `packaging`. Formats : JPEG, PNG, GIF, HEIC. Limite du SDK : 10 Mio avant encodage (`Api::MAX_IMAGE_SIZE`). Les fichiers trop volumineux, vides ou non réguliers sont rejetés localement ; la lecture est bornée avant l’encodage base64. Fonctionne pour tous les flavors.
 
 ### Facettes — `getBrands()`, `getCategories()`, …
 
@@ -162,9 +164,11 @@ Télécharge un dump complet de la base vers un fichier local : `$api->downloadD
 ### Serveur de test — `activeTestMode()`
 
 ```php
-$api->activeTestMode();                        // bascule sur https://world.openfoodfacts.net
+$api->activeTestMode();                        // food/world → https://world.openfoodfacts.net
 $api->authentification('user_staging', 'pw');  // compte contributeur du staging, pour écrire
 ```
+
+Le flavor et la géographie choisis au constructeur sont conservés (ex. `beauty`, `fr` → `https://fr.openbeautyfacts.net`).
 
 `activeTestMode()` configure la protection htaccess (`off`/`off`, envoyée en HTTP Basic) du serveur de staging `.net`. C'est **distinct** du compte contributeur : pour les écritures, fournissez un compte via `authentification()`. Les données du staging sont réinitialisées régulièrement — utilisez-le pour tester `updateProduct()`/`uploadImage()` sans polluer la production.
 
@@ -201,18 +205,18 @@ foreach ($auto->options as $option) { echo $option->text; }
 
 ## Les exceptions
 
-Toutes sous `OpenFoodFacts\Exception` :
+Toutes sous `OpenFoodFacts\Exception`, avec une base commune `ApiException` (qui étend `\Exception`). `UnknownException` conserve son parent `BadRequestException` pour préserver les anciens `catch` ; ce parent historique couvre aussi les erreurs réseau et les réponses inattendues. Les exceptions du transport Guzzle de `SearchApi` et celles d’un cache injecté peuvent encore remonter directement :
 
 ```text
-\Exception
+ApiException
 ├── BadRequestException            erreur générique de requête / réponse API
 │   ├── InvalidParameterException  paramètre invalide (ex. code-barres non numérique)
 │   │   └── MissingCredentialsException  écriture sans authentification()
 │   ├── ProductUpdateException     écriture refusée ou partiellement appliquée
 │   │                              → getResponse() = enveloppe v3 complète
 │   └── UnknownException           réponse inattendue (non-JSON, statut inconnu)
-├── ProductNotFoundException       produit introuvable (getProduct, SearchApi::getDocument)
-├── NotFoundException              404 du moteur de recherche (SearchApi)
+├── NotFoundException              ressource introuvable
+│   └── ProductNotFoundException   produit introuvable (getProduct, SearchApi::getDocument)
 └── ValidationException            422 du moteur de recherche (SearchApi)
 ```
 
@@ -232,7 +236,7 @@ try {
 
 Les trois dépendances sont injectables au constructeur (voir [`examples/01-basic_api_usage/cached_example.php`](../examples/01-basic_api_usage/cached_example.php)) :
 
-- **Cache PSR-16** : les lectures (`getProduct`, facettes) sont cachées 1 h. Les écritures ne sont jamais cachées.
+- **Cache PSR-16** : les lectures (`getProduct`, facettes) sont cachées 1 h. Les écritures ne sont jamais cachées. Les clés incluent l’URL complète : flavor, géographie et environnement `.org`/`.net` sont séparés ; en v3, les paramètres de lecture sont également inclus.
 - **Logger PSR-3** : chaque requête est tracée en `info` ; les échecs réseau et les `success_with_warnings` en `warning`.
 - **Client Guzzle** : injectez le vôtre pour régler timeouts, proxy ou middlewares. Le SDK impose son `User-Agent`, désactive les erreurs HTTP Guzzle sur les routes v3 (statuts gérés par le SDK) et force des redirections **strictes** (un `PATCH`/`POST` redirigé conserve méthode et corps).
 
@@ -242,7 +246,7 @@ Les trois dépendances sont injectables au constructeur (voir [`examples/01-basi
 composer install
 vendor/bin/phpunit --testsuite "Unit test"      # unitaires (MockHandler, sans réseau)
 vendor/bin/phpunit --testsuite "Integration test"  # frappe l'API réelle
-vendor/bin/phpstan                               # analyse statique (niveau 8)
+vendor/bin/phpstan --memory-limit=512M           # analyse statique (niveau 8)
 ```
 
-La CI GitHub Actions rejoue l'ensemble sur PHP 8.1 → 8.4.
+La CI GitHub Actions rejoue l'ensemble sur PHP 8.1 → 8.5.

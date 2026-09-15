@@ -1,5 +1,5 @@
 {
-  "name": "openfoodfacts/openfoodfacts-php",
+  "name": "taciteoff/openfoodfacts-php",
   "description": "Open Food Facts API Wrapper (API v3.6), the open database about food.",
   "homepage": "https://world.openfoodfacts.org/",
   "type": "library",
@@ -28,12 +28,31 @@
   "config": {
     "sort-packages": true
   },
+  "archive": {
+    "exclude": [
+      "/examples",
+      "/tests",
+      "/build",
+      "/vendor",
+      "/.github",
+      "/.gitattributes",
+      "/.gitignore",
+      "/composer.lock",
+      "/phpunit.xml",
+      "/phpstan.neon.dist",
+      "/.phpunit.result.cache",
+      ".DS_Store"
+    ]
+  },
   "require": {
     "php": "^8.1",
     "ext-json": "*",
     "guzzlehttp/guzzle": "^7.4",
     "psr/log": "^3.0",
     "psr/simple-cache": "^3.0"
+  },
+  "conflict": {
+    "openfoodfacts/openfoodfacts-php": "*"
   },
   "autoload": {
     "psr-4": {

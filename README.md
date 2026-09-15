@@ -4,11 +4,13 @@
 
 Fork de [openfoodfacts/openfoodfacts-php](https://github.com/openfoodfacts/openfoodfacts-php), le wrapper PHP pour [Open Food Facts](https://openfoodfacts.org/), la base de données ouverte sur les produits alimentaires.
 
-Ce fork migre le wrapper vers l'**API Open Food Facts v3.6** (schéma produit 1004) et corrige plusieurs bugs de robustesse de la version upstream (v0.4.0), restée sur l'API v0 legacy.
+Ce fork migre la lecture, l’écriture et l’upload d’images produit vers l'**API Open Food Facts v3.6** (schéma produit 1004) et corrige plusieurs bugs de robustesse de la version upstream (v0.4.0), restée sur l'API v0 legacy.
 
 📖 **Documentation complète : [doc/home.md](doc/home.md)** — ce README se concentre sur les différences avec l'upstream.
 
 🚀 **Démo en ligne : [openfoodfacts-php-demo.fly.dev](https://openfoodfacts-php-demo.fly.dev/)** — interface de test du wrapper : lecture complète d'un produit, recherche, changement de langue, et la réponse JSON brute renvoyée par le SDK. Édition et upload de photos disponibles sur le serveur de staging avec un compte contributeur. Interface en français et en anglais. Code source complet : [`examples/02_demo`](examples/02_demo).
+
+La migration v3 concerne les produits et leurs images. `Api::search()` utilise encore `cgi/search.pl` ; `getByFacets()` et les accesseurs de facettes utilisent les URL `.json` du site. Il n’existe pas de recherche v3 : voir la [matrice officielle des API](https://openfoodfacts.github.io/documentation/docs/Product-Opener/api/). Le client `SearchApi` expose séparément Search-a-licious.
 
 ## Installation
 
@@ -20,12 +22,12 @@ Le fork n'est pas publié sur Packagist : installez-le via un dépôt VCS dans v
     { "type": "vcs", "url": "https://github.com/TaciteOFF/openfoodfacts-php" }
   ],
   "require": {
-    "openfoodfacts/openfoodfacts-php": "^1.0"
+    "taciteoff/openfoodfacts-php": "dev-develop"
   }
 }
 ```
 
-(ou `"dev-develop"` pour suivre la branche de développement)
+Le nom Composer du fork est `taciteoff/openfoodfacts-php` ; les namespaces PHP restent `OpenFoodFacts\`. Retirez l’ancienne dépendance `openfoodfacts/openfoodfacts-php` avant migration : les deux packages ne peuvent pas cohabiter. Les tags existants gardent l’ancien nom ; après publication de ces changements sur `develop`, utilisez `dev-develop` en attendant un nouveau tag.
 
 ## Usage rapide
 
@@ -82,14 +84,14 @@ Détails d'implémentation :
 
 ### 4. Tests
 
-- Nouvelle suite unitaire `tests/Unit/OpenFoodFacts/ApiV3Test.php` (11 tests sur `MockHandler` Guzzle) : URL versionnée, enveloppe v3, 404, erreurs lisibles, corps PATCH, payload base64 — sans dépendre de l'API live.
+- Nouvelle suite unitaire `tests/Unit/OpenFoodFacts/ApiV3Test.php` (sur `MockHandler` Guzzle) : URL versionnée, enveloppe v3, 404, erreurs lisibles, corps PATCH, payload base64 — sans dépendre de l'API live.
 - Tests d'intégration mis en cohérence (la restriction « upload food uniquement » n'existe plus en v3).
 
 ## Compatibilité
 
-- PHP **8.1 → 8.4** (aucune syntaxe au-delà de 8.1 ; testé notamment sous 8.3).
+- PHP **8.1 → 8.5** (aucune syntaxe au-delà de 8.1 ; testé notamment sous 8.3).
 - Dépendances inchangées : Guzzle 7, PSR-3, PSR-16.
-- API publique rétrocompatible, à trois exceptions près : `uploadImage()` retourne désormais l'enveloppe v3 et fonctionne pour tous les flavors ; les codes-barres non numériques sont rejetés ; `activeTestMode()` ne pose plus `off`/`off` que comme htaccess du `.net` — pour écrire sur le staging, fournissez un compte contributeur via `authentification()`.
+- API publique rétrocompatible, avec les changements suivants : `uploadImage()` limite les fichiers à 10 Mio avant encodage, retourne désormais l'enveloppe v3 et fonctionne pour tous les flavors ; les codes-barres non numériques sont rejetés ; `activeTestMode()` ne pose plus `off`/`off` que comme htaccess du `.net` — pour écrire sur le staging, fournissez un compte contributeur via `authentification()`.
 - Les nouvelles exceptions (`InvalidParameterException`, `UnknownException`, `ProductUpdateException`) étendent `BadRequestException` : un `catch (BadRequestException)` écrit contre l'upstream continue de les attraper.
 
 ## Licence et crédits

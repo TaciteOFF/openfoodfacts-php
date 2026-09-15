@@ -82,6 +82,9 @@ class Api
      */
     public const API_VERSION = '3.6';
 
+    /** Maximum source image size accepted by this SDK (10 MiB, before base64). */
+    public const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+
     /**
      * Default lifetime (in seconds) of cached API responses
      */
@@ -152,10 +155,15 @@ class Api
         ?ClientInterface $clientInterface = null,
         ?CacheInterface $cacheInterface = null
     ) {
+        if (!isset(self::LIST_API[$currentAPI])) {
+            throw new InvalidParameterException(sprintf('Unknown API flavor "%s"', $currentAPI));
+        }
+
         $this->cache        = $cacheInterface;
         $this->logger       = $logger ?? new NullLogger();
         $this->httpClient   = $clientInterface ?? new Client();
 
+        $this->geography  = $geography;
         $this->geoUrl     = sprintf(self::LIST_API[$currentAPI], $geography);
     }
 
@@ -165,7 +173,8 @@ class Api
      */
     public function activeTestMode(): void
     {
-        $this->geoUrl   = 'https://world.openfoodfacts.net';
+        // Keep the selected flavor and geography; repeated calls are harmless.
+        $this->geoUrl   = substr($this->geoUrl, 0, -4) . '.net';
         // "off"/"off" is the HTTP Basic gate protecting the staging host, NOT an
         // account: call authentification() with a real (staging) account to write
         $this->httpAuth = ['off', 'off'];
@@ -402,7 +411,7 @@ class Api
      * @param string $code the barcode of the product
      * @param string $imageField the information shown on the image (front, ingredients, nutrition, packaging),
      *                           used to select the uploaded image; pass an empty string to only upload
-     * @param string $imagePath the path of the image (JPEG, PNG, GIF or HEIC)
+     * @param string $imagePath the path of the image (JPEG, PNG, GIF or HEIC), at most MAX_IMAGE_SIZE bytes
      * @param string $imageLc 2-letter code of the language shown on the image, used for the selection
      * @return array             the v3 response envelope (status, result, errors, warnings, product)
      * @throws BadRequestException
@@ -423,13 +432,26 @@ class Api
         if (!file_exists($imagePath)) {
             throw new BadRequestException('Image not found');
         }
+        if (!is_file($imagePath) || !is_readable($imagePath)) {
+            throw new InvalidParameterException('Image must be a readable regular file');
+        }
         if (null === $this->auth) {
             throw new MissingCredentialsException('The v3 images API requires credentials: call authentification() first');
         }
 
-        $imageContent = file_get_contents($imagePath);
+        // Bound the read even if the file grows after the size check.
+        if (filesize($imagePath) > self::MAX_IMAGE_SIZE) {
+            throw new InvalidParameterException('Image exceeds the SDK limit of 10 MiB');
+        }
+        $imageContent = @file_get_contents($imagePath, false, null, 0, self::MAX_IMAGE_SIZE + 1);
         if ($imageContent === false) {
             throw new BadRequestException('Image not readable');
+        }
+        if (strlen($imageContent) > self::MAX_IMAGE_SIZE) {
+            throw new InvalidParameterException('Image exceeds the SDK limit of 10 MiB');
+        }
+        if ($imageContent === '') {
+            throw new InvalidParameterException('Image is empty');
         }
 
         $body = [

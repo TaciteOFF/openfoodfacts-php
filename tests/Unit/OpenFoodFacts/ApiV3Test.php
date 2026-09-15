@@ -203,7 +203,7 @@ class ApiV3Test extends TestCase
 
     public function testUploadImageSendsBase64PayloadAndSelection(): void
     {
-        $imagePath = tempnam(sys_get_temp_dir(), 'off') . '.png';
+        $imagePath = tempnam(sys_get_temp_dir(), 'off');
         file_put_contents($imagePath, 'fake-image-bytes');
 
         $mockHandler = new MockHandler([
@@ -239,6 +239,76 @@ class ApiV3Test extends TestCase
 
         $this->expectException(BadRequestException::class);
         $api->uploadImage('3057640385148', 'barcode-photo', __FILE__);
+    }
+
+    public function testUploadImageRejectsOversizedFileBeforeSendingRequest(): void
+    {
+        $imagePath = tempnam(sys_get_temp_dir(), 'off');
+        $file = fopen($imagePath, 'wb');
+        if ($file === false) {
+            $this->fail('Cannot open temporary image');
+        }
+        ftruncate($file, Api::MAX_IMAGE_SIZE + 1);
+        fclose($file);
+        $api = $this->createApi(new MockHandler([]));
+        $api->authentification('user', 'secret');
+
+        try {
+            $this->expectException(InvalidParameterException::class);
+            $this->expectExceptionMessage('10 MiB');
+            $api->uploadImage('123', 'front', $imagePath);
+        } finally {
+            unlink($imagePath);
+            $this->assertCount(0, $this->history());
+        }
+    }
+
+    public function testUploadImageAcceptsFileAtSizeLimit(): void
+    {
+        $imagePath = tempnam(sys_get_temp_dir(), 'off');
+        $file = fopen($imagePath, 'wb');
+        if ($file === false) {
+            $this->fail('Cannot open temporary image');
+        }
+        ftruncate($file, Api::MAX_IMAGE_SIZE);
+        fclose($file);
+        $api = $this->createApi(new MockHandler([
+            new Response(200, [], self::successEnvelope([])),
+        ]));
+        $api->authentification('user', 'secret');
+
+        try {
+            $this->assertSame('success', $api->uploadImage('123', '', $imagePath)['status']);
+        } finally {
+            unlink($imagePath);
+        }
+        $body = json_decode((string) $this->history()[0]['request']->getBody(), true);
+        $this->assertSame((int) (4 * ceil(Api::MAX_IMAGE_SIZE / 3)), strlen($body['image_data_base64']));
+        $this->assertArrayNotHasKey('selected', $body);
+    }
+
+    public function testUploadImageRejectsEmptyFile(): void
+    {
+        $imagePath = tempnam(sys_get_temp_dir(), 'off');
+        $api = $this->createApi(new MockHandler([]));
+        $api->authentification('user', 'secret');
+
+        try {
+            $this->expectException(InvalidParameterException::class);
+            $this->expectExceptionMessage('Image is empty');
+            $api->uploadImage('123', 'front', $imagePath);
+        } finally {
+            unlink($imagePath);
+        }
+    }
+
+    public function testUploadImageRejectsDirectory(): void
+    {
+        $api = $this->createApi(new MockHandler([]));
+        $api->authentification('user', 'secret');
+        $this->expectException(InvalidParameterException::class);
+        $this->expectExceptionMessage('regular file');
+        $api->uploadImage('123', 'front', __DIR__);
     }
 
     public function testPatchKeepsMethodAndBodyAcrossRedirects(): void
