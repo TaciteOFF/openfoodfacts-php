@@ -210,7 +210,8 @@ All under `OpenFoodFacts\Exception`, with a common `ApiException` base (extendin
 ```text
 ApiException
 ├── BadRequestException            generic request / API response error
-│   ├── InvalidParameterException  invalid parameter (e.g. non-numeric barcode)
+│   ├── InvalidParameterException  invalid parameter
+│   │   ├── InvalidBarcodeException  empty barcode or characters other than ASCII digits
 │   │   └── MissingCredentialsException  write without authentification()
 │   ├── ProductUpdateException     write rejected or partially applied
 │   │                              → getResponse() = full v3 envelope
@@ -220,11 +221,17 @@ ApiException
 └── ValidationException            422 from the search engine (SearchApi)
 ```
 
+`getProduct()`, `updateProduct()` and `uploadImage()` reject invalid barcodes before any HTTP request. `InvalidBarcodeException::getBarcode()` returns the rejected value. Leading zeros are preserved; whitespace and separators are not removed. Existing `catch (InvalidParameterException)` blocks remain compatible.
+
 A `catch (BadRequestException $e)` therefore catches every `Api` client error except `ProductNotFoundException`, to handle separately:
 
 ```php
+use OpenFoodFacts\Exception\InvalidBarcodeException;
+
 try {
     $product = $api->getProduct($barcode);
+} catch (InvalidBarcodeException $e) {
+    // ask for a barcode containing only digits
 } catch (ProductNotFoundException) {
     // unknown product
 } catch (BadRequestException $e) {

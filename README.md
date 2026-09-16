@@ -74,7 +74,7 @@ Détails d'implémentation :
 - **TTL sur le cache de lecture (1 h)** : l'upstream cachait les fiches produit sans expiration.
 - **Décodage JSON strict** (`JSON_THROW_ON_ERROR`) et **vérification du statut HTTP** : une page HTML d'erreur du serveur provoquait un `TypeError` dans l'upstream.
 - **Validation du code-barres** (chiffres uniquement) et encodage URL : plus d'injection possible de segments d'URL via `getProduct()`.
-- `404` → `ProductNotFoundException`, credentials manquants → `MissingCredentialsException`, code-barres invalide → `InvalidParameterException`.
+- `404` → `ProductNotFoundException`, credentials manquants → `MissingCredentialsException`, code-barres invalide → `InvalidBarcodeException` (étend `InvalidParameterException`, valeur rejetée accessible via `getBarcode()`).
 - **`activeTestMode()` distingue le htaccess du staging des identifiants du contributeur** : `off`/`off` est la protection htaccess (HTTP Basic) du serveur de test `.net`, pas un compte contributeur. Le SDK l'envoie dans l'en-tête `Authorization`, tandis que les identifiants du contributeur — fournis via `authentification()` — partent dans le corps des écritures v3 (`user_id`/`password`). L'upstream confondait les deux : `activeTestMode()` écrasait les identifiants du contributeur avec `off`/`off`, faisant échouer toute écriture sur le staging.
 
 ### 3. Documentation et exemples réparés

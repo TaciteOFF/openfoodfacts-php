@@ -74,7 +74,7 @@ Implementation details:
 - **TTL on the read cache (1 h)**: upstream cached product data with no expiration.
 - **Strict JSON decoding** (`JSON_THROW_ON_ERROR`) and **HTTP status checks**: an HTML error page from the server caused a `TypeError` in upstream.
 - **Barcode validation** (digits only) and URL encoding: no more URL segment injection through `getProduct()`.
-- `404` → `ProductNotFoundException`, missing credentials → `MissingCredentialsException`, invalid barcode → `InvalidParameterException`.
+- `404` → `ProductNotFoundException`, missing credentials → `MissingCredentialsException`, invalid barcode → `InvalidBarcodeException` (extends `InvalidParameterException`, rejected value available through `getBarcode()`).
 - **`activeTestMode()` separates the staging htaccess from the contributor credentials**: `off`/`off` is the htaccess (HTTP Basic) gate of the `.net` test server, not a contributor account. The SDK sends it in the `Authorization` header, while the contributor credentials — provided through `authentification()` — go into the body of v3 writes (`user_id`/`password`). Upstream conflated the two: `activeTestMode()` overwrote the contributor credentials with `off`/`off`, making every staging write fail.
 
 ### 3. Fixed documentation and examples

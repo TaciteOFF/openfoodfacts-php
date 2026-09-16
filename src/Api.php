@@ -9,6 +9,7 @@ use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\TransferStats;
 use OpenFoodFacts\Exception\BadRequestException;
+use OpenFoodFacts\Exception\InvalidBarcodeException;
 use OpenFoodFacts\Exception\InvalidParameterException;
 use OpenFoodFacts\Exception\MissingCredentialsException;
 use OpenFoodFacts\Exception\ProductNotFoundException;
@@ -245,9 +246,17 @@ class Api
     }
 
 
+    /** @throws InvalidBarcodeException */
+    private static function assertValidBarcode(string $barcode): void
+    {
+        if ($barcode === '' || !ctype_digit($barcode)) {
+            throw new InvalidBarcodeException($barcode);
+        }
+    }
+
     /**
      * this function search an Document by barcode, using the versioned v3 READ API
-     * @param string $barcode the barcode [\d]{4,14}
+     * @param string $barcode a non-empty barcode containing only ASCII digits (leading zeros are preserved)
      * @param array<int, string>|null $fields list of fields to include in the response
      *                                        (special values: "all", "none", "raw", "knowledge_panels").
      *                                        null returns all fields
@@ -260,16 +269,14 @@ class Api
      *                                 stored on another flavor is reported as not found
      * @return Document         A Document if found
      * @throws InvalidArgumentException
-     * @throws InvalidParameterException
+     * @throws InvalidBarcodeException
      * @throws ProductNotFoundException
      * @throws BadRequestException
      * @throws UnknownException
      */
     public function getProduct(string $barcode, ?array $fields = null, ?string $lc = null, ?string $cc = null, ?string $tagsLc = null, ?string $productType = null): Document
     {
-        if ($barcode === '' || !ctype_digit($barcode)) {
-            throw new InvalidParameterException(sprintf('Barcode "%s" is invalid: it must only contain digits', $barcode));
-        }
+        self::assertValidBarcode($barcode);
 
         $query = array_filter([
             'fields'       => $fields !== null ? implode(',', $fields) : null,
@@ -333,7 +340,7 @@ class Api
      * @param string|null $tagsLc 2-letter language code for taxonomy tags
      * @return array the v3 response envelope (status, result, errors, warnings, product)
      * @throws BadRequestException
-     * @throws InvalidParameterException
+     * @throws InvalidBarcodeException
      * @throws MissingCredentialsException
      * @throws ProductNotFoundException
      * @throws ProductUpdateException when the write failed or was only partially applied
@@ -341,9 +348,7 @@ class Api
      */
     public function updateProduct(string $barcode, array $productData, ?array $fields = null, ?string $lc = null, ?string $cc = null, ?string $tagsLc = null): array
     {
-        if ($barcode === '' || !ctype_digit($barcode)) {
-            throw new InvalidParameterException(sprintf('Barcode "%s" is invalid: it must only contain digits', $barcode));
-        }
+        self::assertValidBarcode($barcode);
         if (null === $this->auth) {
             throw new MissingCredentialsException('The v3 WRITE API requires credentials: call authentification() first');
         }
@@ -415,6 +420,7 @@ class Api
      * @param string $imageLc 2-letter code of the language shown on the image, used for the selection
      * @return array             the v3 response envelope (status, result, errors, warnings, product)
      * @throws BadRequestException
+     * @throws InvalidBarcodeException
      * @throws InvalidParameterException
      * @throws MissingCredentialsException
      * @throws ProductNotFoundException
@@ -423,9 +429,7 @@ class Api
      */
     public function uploadImage(string $code, string $imageField, string $imagePath, string $imageLc = 'en'): array
     {
-        if ($code === '' || !ctype_digit($code)) {
-            throw new InvalidParameterException(sprintf('Barcode "%s" is invalid: it must only contain digits', $code));
-        }
+        self::assertValidBarcode($code);
         if ($imageField !== '' && !in_array($imageField, ['front', 'ingredients', 'nutrition', 'packaging'], true)) {
             throw new BadRequestException('ImageField not valid!');
         }

@@ -11,11 +11,13 @@ use OpenFoodFacts\Api;
 use OpenFoodFacts\Document\FoodDocument;
 use OpenFoodFacts\Document\ProductDocument;
 use OpenFoodFacts\Exception\BadRequestException;
+use OpenFoodFacts\Exception\InvalidBarcodeException;
 use OpenFoodFacts\Exception\InvalidParameterException;
 use OpenFoodFacts\Exception\MissingCredentialsException;
 use OpenFoodFacts\Exception\ProductNotFoundException;
 use OpenFoodFacts\Exception\ProductUpdateException;
 use OpenFoodFacts\Exception\UnknownException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\RequestInterface;
 
@@ -119,12 +121,49 @@ class ApiV3Test extends TestCase
         $api->getProduct('3057640385140');
     }
 
-    public function testGetProductRejectsNonNumericBarcode(): void
+    public static function invalidBarcodes(): iterable
+    {
+        foreach (['', 'foo/../bar', '123abc', ' 123', '123 ', '12-34', '12.34', '+123', "123\n", '１２３', '١٢٣'] as $barcode) {
+            foreach (['getProduct', 'updateProduct', 'uploadImage'] as $method) {
+                yield [$method, $barcode];
+            }
+        }
+    }
+
+    #[DataProvider('invalidBarcodes')]
+    public function testInvalidBarcodeIsRejectedBeforeAnyRequest(string $method, string $barcode): void
     {
         $api = $this->createApi(new MockHandler([]));
 
-        $this->expectException(InvalidParameterException::class);
-        $api->getProduct('foo/../bar');
+        try {
+            match ($method) {
+                'getProduct' => $api->getProduct($barcode),
+                'updateProduct' => $api->updateProduct($barcode, []),
+                'uploadImage' => $api->uploadImage($barcode, 'front', __FILE__),
+                default => $this->fail('Unknown API method: ' . $method),
+            };
+            $this->fail('Expected an invalid barcode exception');
+        } catch (InvalidBarcodeException $exception) {
+            $this->assertSame($barcode, $exception->getBarcode());
+            $this->assertInstanceOf(InvalidParameterException::class, $exception);
+            $this->assertInstanceOf(BadRequestException::class, $exception);
+            $this->assertSame($barcode === ''
+                ? 'Barcode is invalid: it must not be empty'
+                : sprintf('Barcode "%s" is invalid: it must only contain digits', $barcode), $exception->getMessage());
+            $this->assertSame([], $this->history());
+        }
+    }
+
+    public function testGetProductPreservesLeadingZeros(): void
+    {
+        $barcode = '0001234567890';
+        $api = $this->createApi(new MockHandler([
+            new Response(200, [], self::successEnvelope(['code' => $barcode])),
+        ]));
+
+        $api->getProduct($barcode);
+
+        $this->assertSame('/api/v' . Api::API_VERSION . '/product/' . $barcode, $this->history()[0]['request']->getUri()->getPath());
     }
 
     public function testGetProductThrowsOnNonJsonResponse(): void
