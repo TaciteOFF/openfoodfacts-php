@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.1.1](https://github.com/TaciteOFF/openfoodfacts-php/compare/v1.1.0...v1.1.1) (2026-09-16)
+
+### Fixes and improvements
+
+* Add `InvalidBarcodeException` for empty or non-numeric barcodes, with the rejected value available through `getBarcode()` and a specific message for empty input.
+* Preserve compatibility with existing `catch (InvalidParameterException)` and `catch (BadRequestException)` blocks.
+* Centralize barcode validation for `getProduct()`, `updateProduct()` and `uploadImage()`, rejecting invalid values before any HTTP request and preserving leading zeros.
+* Update the French and English documentation with the exception hierarchy and handling examples.
+
+### Maintenance
+
+* Remove the automatic release workflow and disable automated review reporting.
+
+### Validation
+
+* Unit tests on PHP 8.5: 72 tests, 282 assertions, no failures.
+* PHPStan level 8 and strict Composer validation pass.
+* GitHub Actions passes on PHP 8.1, 8.2, 8.3, 8.4 and 8.5 for the barcode validation changes.
+
 ## [1.1.0](https://github.com/TaciteOFF/openfoodfacts-php/compare/v1.0.0...v1.1.0) (2026-09-15)
 
 ### Migration
